@@ -9,6 +9,7 @@
 // ==================== 版本信息 ====================
 #define FIRMWARE_VERSION            "v2.0-MVP"
 #define BUILD_DATE                  __DATE__ " " __TIME__
+#define DEVICE_ID                   "POLE_001"  // 设备唯一标识（生产时替换为实际ID）
 
 // --- 核心模式开关 ---
 #define USE_MOCK_HARDWARE   1     // 1=仿真模式, 0=真实硬件

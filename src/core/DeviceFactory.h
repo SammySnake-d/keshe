@@ -8,15 +8,18 @@
 #include "../../include/AppConfig.h"
 #include "../interfaces/ISensor.h"
 #include "../interfaces/IComm.h"
+#include "../interfaces/IGPS.h"
 
 // Mock 实现
 #if USE_MOCK_HARDWARE
     #include "../modules/mock/MockTiltSensor.h"
     #include "../modules/mock/MockComm.h"
+    #include "../modules/mock/MockGPS.h"
 // Real 实现
 #else
     #include "../modules/real/LSM6DS3_Sensor.h"
     #include "../modules/real/EC800K_Driver.h"
+    #include "../modules/real/ATGM336H_Driver.h"
 #endif
 
 class DeviceFactory {
@@ -50,6 +53,22 @@ public:
         #else
             DEBUG_PRINTLN("EC800K_Driver");
             return new EC800K_Driver();
+        #endif
+    }
+
+    /**
+     * @brief 创建 GPS 模块实例
+     * @return IGPS* 实例指针
+     */
+    static IGPS* createGpsModule() {
+        DEBUG_PRINT("[Factory] 创建 GPS 模块: ");
+        
+        #if USE_MOCK_HARDWARE
+            DEBUG_PRINTLN("MockGPS");
+            return new MockGPS();
+        #else
+            DEBUG_PRINTLN("ATGM336H_Driver");
+            return new ATGM336H_Driver();
         #endif
     }
 

@@ -96,8 +96,27 @@ public:
     }
     
     bool sendStatus(const char* payload) override {
-        // 实现与 sendAlarm 类似，但使用不同的主题
-        return true;
+        if (!isNetworkReady) {
+            DEBUG_PRINTLN("[EC800K] ❌ 网络未就绪");
+            return false;
+        }
+        
+        DEBUG_PRINTF("[EC800K] 发送状态到: %s\n", MQTT_TOPIC_STATUS);
+        
+        String cmd = "AT+QMTPUBEX=0,0,0,0,\"" + String(MQTT_TOPIC_STATUS) + "\"," + String(strlen(payload));
+        modemSerial.println(cmd);
+        delay(100);
+        
+        if (waitForResponse(">", 2000)) {
+            modemSerial.print(payload);
+            if (waitForResponse("+QMTPUBEX: 0,0,0", 5000)) {
+                DEBUG_PRINTLN("[EC800K] ✓ 发送成功");
+                return true;
+            }
+        }
+        
+        DEBUG_PRINTLN("[EC800K] ❌ 发送失败");
+        return false;
     }
     
     void sleep() override {

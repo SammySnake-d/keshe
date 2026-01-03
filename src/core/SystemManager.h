@@ -80,11 +80,14 @@ public:
             DEBUG_PRINTLN("[SYS] 系统休眠中... ZZZ");
             esp_deep_sleep_start();
         #else
-            // Wokwi 模拟模式：使用 delay 代替深度睡眠（保持 RTC 内存）
-            DEBUG_PRINTLN("[SYS] 🔧 Wokwi 模式：延时模拟休眠（保持内存）");
-            delay(seconds * 1000);
+            // Wokwi 模拟模式：使用短循环代替长 delay（避免看门狗超时）
+            DEBUG_PRINTLN("[SYS] 🔧 Wokwi 模式：模拟休眠（保持内存）");
+            for (uint32_t i = 0; i < seconds; i++) {
+                delay(1000);  // 每秒喂一次狗
+                yield();      // 让出 CPU，避免看门狗
+            }
             DEBUG_PRINTLN("[SYS] ⏰ 定时器唤醒（模拟）\n");
-            // 注意：不调用 ESP.restart()，让程序自然返回 loop()
+            // 返回后让程序自然进入 loop()
         #endif
     }
 
@@ -128,6 +131,27 @@ public:
         return true;
     }
 
+    /**
+     * @brief 打印唤醒原因
+     */
+    static void printWakeupReason() {
+        esp_sleep_wakeup_cause_t wakeup_reason = getWakeupCause();
+        
+        Serial.print("[SYS] 唤醒原因: ");
+        switch(wakeup_reason) {
+            case ESP_SLEEP_WAKEUP_EXT0:
+                Serial.println("GPIO 中断 (声音触发)");
+                break;
+            case ESP_SLEEP_WAKEUP_TIMER:
+                Serial.println("定时器唤醒 (心跳检测)");
+                break;
+            case ESP_SLEEP_WAKEUP_UNDEFINED:
+            default:
+                Serial.println("首次启动 / 复位");
+                break;
+        }
+    }
+
 private:
     /**
      * @brief 配置唤醒源
@@ -156,30 +180,6 @@ private:
         Serial.printf( "║   运行模式: %-27s ║\n", USE_MOCK_HARDWARE ? "Mock (开发)" : "Real (生产)");
         Serial.println("╚════════════════════════════════════════════╝");
         Serial.println();
-        
-        // 打印唤醒原因
-        printWakeupReason();
-    }
-
-    /**
-     * @brief 打印唤醒原因
-     */
-    static void printWakeupReason() {
-        esp_sleep_wakeup_cause_t wakeup_reason = getWakeupCause();
-        
-        Serial.print("[SYS] 唤醒原因: ");
-        switch(wakeup_reason) {
-            case ESP_SLEEP_WAKEUP_EXT0:
-                Serial.println("GPIO 中断 (声音触发)");
-                break;
-            case ESP_SLEEP_WAKEUP_TIMER:
-                Serial.println("定时器唤醒 (心跳检测)");
-                break;
-            case ESP_SLEEP_WAKEUP_UNDEFINED:
-            default:
-                Serial.println("首次启动 / 复位");
-                break;
-        }
     }
 };
 

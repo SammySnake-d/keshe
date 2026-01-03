@@ -1,6 +1,5 @@
 #pragma once
 #include <Arduino.h>
-#pragma once
 
 /**
  * @file IComm.h
@@ -24,15 +23,15 @@ public:
     virtual bool connectNetwork() = 0;
 
     /**
-     * @brief 发送报警数据
-     * @param payload JSON 格式的数据
+     * @brief 发送报警数据（JSON 格式）
+     * @param payload JSON 字符串
      * @return true=发送成功, false=发送失败
      */
     virtual bool sendAlarm(const char* payload) = 0;
 
     /**
-     * @brief 发送状态心跳
-     * @param payload JSON 格式的数据
+     * @brief 发送状态心跳（JSON 格式）
+     * @param payload JSON 字符串
      * @return true=发送成功, false=发送失败
      */
     virtual bool sendStatus(const char* payload) = 0;
