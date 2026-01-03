@@ -1,5 +1,5 @@
 [wokwi]
 version = 1
-firmware = ".pio/build/esp32-s3-pole-monitor/firmware.bin"
-elf = ".pio/build/esp32-s3-pole-monitor/firmware.elf"
+firmware = ".pio/build/test-psram/firmware.bin"
+elf = ".pio/build/test-psram/firmware.elf"
 gdbServerPort = 3333
