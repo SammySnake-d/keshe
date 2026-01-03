@@ -44,6 +44,20 @@ public:
     }
     
     /**
+     * @brief 获取初始 Pitch 角度（零点校准值）
+     */
+    static float getInitialPitch() {
+        return g_initialPitch;
+    }
+    
+    /**
+     * @brief 获取初始 Roll 角度（零点校准值）
+     */
+    static float getInitialRoll() {
+        return g_initialRoll;
+    }
+    
+    /**
      * @brief 获取相对倾角（相对于初始姿态）
      * @param currentPitch 当前俯仰角
      * @param currentRoll 当前横滚角
@@ -92,8 +106,20 @@ public:
     }
 
     /**
-     * @brief 读取电池电压
+     * @brief 读取电池电压（改进版 - 使用 Arduino ESP32 官方校准 API）
      * @return 电压值 (V)
+     * 
+     * 改进点:
+     *   1. 使用 analogReadMilliVolts() 自动校准（考虑芯片个体差异）
+     *   2. 多次采样取平均值（滤除噪声和 4G 模块瞬间掉压）
+     *   3. 在 4G 模块空闲时采样（避免大电流干扰）
+     * 
+     * 硬件说明:
+     *   - 电池电压通过 R16(2kΩ)+R17(2kΩ) 1:1 分压后连接到 GPIO11
+     *   - ESP32-S3 ADC 测量范围: 0-3.3V (ADC_11db 衰减)
+     *   - 实际电池电压 = 测量电压 × 2.0 (分压系数)
+     * 
+     * @note 分压电路持续漏电约 1mA，长期使用建议添加 GPIO 控制开关
      */
     static float readBatteryVoltage() {
         #if USE_MOCK_HARDWARE
@@ -103,12 +129,55 @@ public:
             DEBUG_PRINTF("[SYS] 电池电压 (Mock): %.2fV\n", g_mockVoltage);
             return g_mockVoltage;
         #else
-            // Real: ADC 读取，分压系数 2.0
-            uint32_t adcRaw = analogRead(PIN_BAT_ADC);
-            float voltage = (adcRaw / 4095.0f) * 3.3f * 2.0f;
-            DEBUG_PRINTF("[SYS] 电池电压: %.2fV (ADC: %d)\n", voltage, adcRaw);
-            return voltage;
+            // Real: 使用官方校准 API + 多次采样滤波
+            
+            // 1. 配置 ADC 衰减（测量 0-3.3V 范围）
+            analogSetPinAttenuation(PIN_BAT_ADC, ADC_11db);
+            
+            // 2. 多次采样取平均（降低噪声，滤除 4G 模块瞬间掉压）
+            const int SAMPLES = 10;
+            uint32_t sum_mv = 0;
+            
+            for (int i = 0; i < SAMPLES; i++) {
+                // 使用 analogReadMilliVolts() 自动校准（考虑芯片个体差异）
+                sum_mv += analogReadMilliVolts(PIN_BAT_ADC);
+                delay(5);  // 每次采样间隔 5ms
+            }
+            
+            // 3. 计算平均值并转换为实际电池电压
+            float avg_mv = sum_mv / (float)SAMPLES;
+            float measured_voltage = avg_mv / 1000.0f;  // mV -> V
+            float battery_voltage = measured_voltage * BAT_VOLTAGE_DIV;  // 还原分压
+            
+            DEBUG_PRINTF("[SYS] 电池电压: %.2fV (测量: %.2fV, 平均: %.0fmV)\n", 
+                        battery_voltage, measured_voltage, avg_mv);
+            
+            return battery_voltage;
         #endif
+    }
+    
+    /**
+     * @brief 获取电池电量百分比
+     * @return 0-100 (百分比)
+     * 
+     * 锂电池放电曲线（简化线性模型）:
+     *   4.2V = 100% (满电)
+     *   3.7V = 50%  (中等)
+     *   3.4V = 0%   (低电量保护)
+     */
+    static int getBatteryPercentage() {
+        float voltage = readBatteryVoltage();
+        
+        // 满电保护
+        if (voltage >= 4.2f) return 100;
+        
+        // 低电量保护
+        if (voltage <= BAT_LOW_LIMIT) return 0;
+        
+        // 线性映射 (简化模型，实际锂电池曲线非线性)
+        int percentage = (int)((voltage - BAT_LOW_LIMIT) / (4.2f - BAT_LOW_LIMIT) * 100);
+        
+        return constrain(percentage, 0, 100);
     }
 
     /**

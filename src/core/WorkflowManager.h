@@ -12,6 +12,7 @@
 #include "../interfaces/IAudio.h"
 #include "../interfaces/ICamera.h"
 #include "../utils/DataPayload.h"
+#include "../modules/real/LSM6DS3_Sensor.h"
 #include "DeviceFactory.h"
 #include "SystemManager.h"
 
@@ -30,9 +31,16 @@ public:
             return;
         }
         
-        float initialAngle = tiltSensor->readData();
-        SystemManager::calibrateInitialPose(initialAngle, 0);
-        DEBUG_PRINTF("[SYS] 零点校准完成: Pitch=%.2f°, Roll=0.00°\n", initialAngle);
+        // 读取初始角度（绝对值）
+        LSM6DS3_Sensor* lsm = static_cast<LSM6DS3_Sensor*>(tiltSensor);
+        float initialPitch = lsm->getAbsolutePitch();
+        float initialRoll = 0.0f;  // 简化处理，仅校准 Pitch
+        
+        // 保存到 RTC 内存和传感器对象
+        SystemManager::calibrateInitialPose(initialPitch, initialRoll);
+        lsm->calibrate(initialPitch, initialRoll);
+        
+        DEBUG_PRINTF("[SYS] 零点校准完成: Pitch=%.2f°, Roll=%.2f°\n", initialPitch, initialRoll);
         
         // 音频传感器初始化
         IAudio* audioSensor = DeviceFactory::createAudioSensor();
@@ -49,24 +57,27 @@ public:
     
     /**
      * @brief 定时器唤醒 - 心跳巡检流程
-     * @note 由于声音传感器为模拟信号输出，无法触发硬件中断
-     *       因此在每次定时器唤醒时同时检查声音
+     * @note 每次唤醒时检查倾斜和声音，判断是否超过阈值
      */
     static void handleTimerWakeup() {
         DEBUG_PRINTLN("\n[MAIN] ⏰ 定时器唤醒 - 心跳巡检");
         
+        // 读取并显示电池状态
         float batteryVoltage = SystemManager::readBatteryVoltage();
+        int batteryPercent = SystemManager::getBatteryPercentage();
+        DEBUG_PRINTF("[MAIN] 🔋 电池状态: %.2fV (%d%%)\n", batteryVoltage, batteryPercent);
         
-        // 1. 读取倾角
+        // 1. 读取倾角（相对于初始位置的偏移）
         float relativeAngle = readTiltAngle();
         if (relativeAngle < 0) {
             SystemManager::deepSleep(SLEEP_DURATION_NORMAL);
             return;
         }
         
-        // 2. 检查是否超过倾斜阈值触发报警
+        // 2. 检查是否超过 5° 倾斜阈值（软件判断）
         if (relativeAngle > TILT_THRESHOLD) {
-            DEBUG_PRINTLN("\n[MAIN] 🚨 检测到倾斜！启动报警流程");
+            DEBUG_PRINTF("\n[MAIN] 🚨 检测到倾斜 %.2f° > %.2f° 阈值！启动报警流程\n", 
+                        relativeAngle, TILT_THRESHOLD);
             
             if (sendTiltAlarmWithPhoto(relativeAngle, batteryVoltage)) {
                 SystemManager::deepSleep(SLEEP_DURATION_ALARM);
@@ -109,6 +120,11 @@ public:
     static void handleAudioWakeup() {
         DEBUG_PRINTLN("\n[MAIN] 🔊 声音中断唤醒 - 异常音检测");
         
+        // 读取并显示电池状态
+        float batteryVoltage = SystemManager::readBatteryVoltage();
+        int batteryPercent = SystemManager::getBatteryPercentage();
+        DEBUG_PRINTF("[MAIN] 🔋 电池状态: %.2fV (%d%%)\n", batteryVoltage, batteryPercent);
+        
         // 确认是否真的是声音触发（二次确认）
         IAudio* audioSensor = DeviceFactory::createAudioSensor();
         if (!audioSensor || !audioSensor->init() || !audioSensor->isNoiseDetected()) {
@@ -125,8 +141,6 @@ public:
         audioSensor->sleep();
         DeviceFactory::destroy(audioSensor);
         
-        float batteryVoltage = SystemManager::readBatteryVoltage();
-        
         sendNoiseAlarmWithPhoto(batteryVoltage, soundLevel);
         
         DEBUG_PRINTLN("[MAIN] ✓ 声音报警完成，进入休眠\n");
@@ -135,7 +149,7 @@ public:
 
 private:
     /**
-     * @brief 读取倾角数据
+     * @brief 读取倾角数据（相对于初始位置）
      * @return 相对倾角，失败返回 -1
      */
     static float readTiltAngle() {
@@ -146,10 +160,16 @@ private:
             return -1.0f;
         }
         
-        float currentAngle = tiltSensor->readData();
-        float relativeAngle = SystemManager::getRelativeTilt(currentAngle, 0);
+        // 恢复零点校准值（从 RTC 内存读取）
+        LSM6DS3_Sensor* lsm = static_cast<LSM6DS3_Sensor*>(tiltSensor);
+        float initialPitch = SystemManager::getInitialPitch();
+        float initialRoll = SystemManager::getInitialRoll();
+        lsm->calibrate(initialPitch, initialRoll);
         
-        DEBUG_PRINTF("[MAIN] 📐 当前倾角: %.2f° (相对初始: %.2f°)\n", currentAngle, relativeAngle);
+        // 读取相对倾角（已经在 readData 中计算相对值）
+        float relativeAngle = tiltSensor->readData();
+        
+        DEBUG_PRINTF("[MAIN] 📐 相对倾角: %.2f°\n", relativeAngle);
         
         tiltSensor->sleep();
         DeviceFactory::destroy(tiltSensor);
