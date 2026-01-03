@@ -162,7 +162,9 @@ private:
         
         // 2. GPIO 唤醒（声音传感器）
         #if !USE_MOCK_HARDWARE
-            esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_MIC_TRIGGER, HIGH);
+            // 注意: 模拟信号无法直接触发中断，此配置仅作为备用
+            // 如需声音中断唤醒，需外接比较器输出到此引脚
+            esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_MIC_ANALOG, HIGH);
             DEBUG_PRINTLN("[SYS] 已启用 GPIO 唤醒源 (声音传感器)");
         #endif
     }

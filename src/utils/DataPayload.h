@@ -90,17 +90,22 @@ struct LowBatteryPayload {
  */
 struct NoiseAlarmPayload {
     float voltage;          // 电池电压
+    uint16_t soundLevel;    // 声音峰峰值 (0-4095)
+    uint8_t soundPercent;   // 声音强度百分比 (0-100)
     bool hasGps;            // 是否包含 GPS
     GpsLocation location;   // GPS 坐标（可选）
     unsigned long timestamp; // 时间戳
     
-    NoiseAlarmPayload() : voltage(0.0f), hasGps(false), location(), timestamp(0) {}
+    NoiseAlarmPayload() : voltage(0.0f), soundLevel(0), soundPercent(0), 
+                          hasGps(false), location(), timestamp(0) {}
     
-    NoiseAlarmPayload(float vol) 
-        : voltage(vol), hasGps(false), location(), timestamp(millis()) {}
+    NoiseAlarmPayload(float vol, uint16_t level = 0) 
+        : voltage(vol), soundLevel(level), soundPercent(map(level, 0, 4095, 0, 100)),
+          hasGps(false), location(), timestamp(millis()) {}
     
-    NoiseAlarmPayload(float vol, double lat, double lon) 
-        : voltage(vol), hasGps(true), location(lat, lon), timestamp(millis()) {}
+    NoiseAlarmPayload(float vol, uint16_t level, double lat, double lon) 
+        : voltage(vol), soundLevel(level), soundPercent(map(level, 0, 4095, 0, 100)),
+          hasGps(true), location(lat, lon), timestamp(millis()) {}
     
     /**
      * @brief 使用 ArduinoJson 序列化为 JSON 字符串
@@ -109,6 +114,8 @@ struct NoiseAlarmPayload {
         StaticJsonDocument<384> doc;
         doc["type"] = "NOISE";
         doc["voltage"] = serialized(String(voltage, 2));
+        doc["soundLevel"] = soundLevel;
+        doc["soundPercent"] = soundPercent;
         doc["timestamp"] = timestamp;
         
         // 如果有 GPS 数据，添加 location 字段

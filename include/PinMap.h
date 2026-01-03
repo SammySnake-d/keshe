@@ -20,7 +20,6 @@
 // [模块 1: 摄像头 OV2640]
 // 电源控制: U1.16 -> IO46
 #define PIN_CAM_PWDN        46  // High=OFF, Low=ON
-#define PIN_CAM_RESET       -1  // 未连接
 
 // 数据总线 (注意: 此处数字均为 GPIO 编号)
 // U1.9  -> IO16
@@ -44,7 +43,6 @@
 // U1.26 -> IO45
 // U1.25 -> IO48
 // U1.24 -> IO47
-#define PIN_CAM_XCLK        -1 //未连接
 #define PIN_CAM_VSYNC       48
 #define PIN_CAM_HREF        47
 #define PIN_CAM_PCLK        45  // 对应网表 'CAM_DCLK' (U1.26)
@@ -68,9 +66,11 @@
 #define PIN_GPS_PWR         1   // Low=ON
 
 // [模块 4: 传感器与交互]
-// 声音: U1.12 -> IO8
-#define PIN_MIC_TRIGGER     8
-// 音频控制: U1.13 -> IO19 (连接到C13/R5，可能是偏置电压控制)
+// 声音传感器 (模拟信号输出)
+// 电路: GMI9767P-58DB麦克风 → LM321S5运放放大 → R5+C13滤波 → GPIO8
+// U1.12 -> IO8 (ADC1_CH7)
+#define PIN_MIC_ANALOG      8   // ADC 模拟输入（读取音量等级）
+// 音频偏置控制: U1.13 -> IO19 (连接到运放电路)
 #define PIN_MIC_CTRL        19 
 
 // 电池: U1.19 -> IO11
@@ -90,8 +90,21 @@
 // ==========================================
 // 🟢 剩余可用 GPIO (Available for Future)
 // ==========================================
-// IO 2， 13, 14, 20, 35, 36, 37 可用于扩展
-// (U1.21, U1.22, U1.14, U1.27, U1.29, U1.30)
+// IO 13, 14, 20, 35, 36, 37 可用于扩展
+// (U1.22, U1.14, U1.27, U1.29, U1.30)
+
+// ==========================================
+// 🔧 摄像头补充引脚 (需要飞线连接)
+// ==========================================
+// OV2640 必须要有 XCLK 主时钟才能工作
+// ESP32-S3 通过 LEDC PWM 外设生成 20MHz 时钟信号
+// 
+// 硬件连接方式:
+//   方案A (推荐): GPIO2 (U1.21) 飞线到 OV2640 的 XCLK 引脚
+//   方案B: 使用外部 20MHz 晶振连接到 OV2640 的 XCLK
+#define PIN_CAM_XCLK        2   // U1.21 -> IO2 (LEDC 生成 20MHz 时钟)
+#define PIN_CAM_RESET       -1  // 未连接 (可选，通过 SCCB 软复位)
+
 
 // LSM6DS3 中断引脚 (PCB 未连接，需飞线)
 // 选择依据: RTC GPIO + 物理位置靠近 I2C
