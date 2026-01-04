@@ -75,10 +75,15 @@
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║                    💤 休眠策略                                     ║
 // ╚══════════════════════════════════════════════════════════════════╝
-#define SLEEP_DURATION_NORMAL       5           // 正常休眠时长 (秒) - Wokwi 测试
-#define SLEEP_DURATION_LOW_BAT      10          // 低电量休眠时长 (秒) - Wokwi 测试
-#define SLEEP_DURATION_ALARM        3           // 报警后短休眠 (秒) - Wokwi 测试
-#define HEARTBEAT_INTERVAL_SEC      3600        // 心跳/巡检间隔 (秒)
+#if USE_MOCK_HARDWARE
+    #define HEARTBEAT_INTERVAL_SEC      5       // Wokwi 测试: 5秒快速心跳
+    #define SLEEP_DURATION_LOW_BAT      10      // 低电量休眠时长 (秒)
+    #define SLEEP_DURATION_ALARM        3       // 报警后短休眠 (秒)
+#else
+    #define HEARTBEAT_INTERVAL_SEC      3600    // 真实硬件: 1小时心跳
+    #define SLEEP_DURATION_LOW_BAT      7200    // 低电量休眠: 2小时
+    #define SLEEP_DURATION_ALARM        60      // 报警后短休眠: 1分钟
+#endif
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║                    🌐 HTTP API 配置                                ║

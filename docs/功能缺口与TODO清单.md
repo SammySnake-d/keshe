@@ -31,10 +31,10 @@
     - 4G 模块通过 `DTR` 休眠 + `QIDEACT`：`src/modules/real/EC800K_Driver.h`（`sleep()`）
 - **缺口/未实现**：
   - **默认未启用真实深度睡眠**：`include/AppConfig.h`：`ENABLE_DEEP_SLEEP=0`。
-  - **心跳间隔未按 `HEARTBEAT_INTERVAL_SEC` 执行**：`include/Settings.h` 有 `HEARTBEAT_INTERVAL_SEC=3600`，但 `WorkflowManager::handleTimerWakeup()` 末尾使用的是 `SLEEP_DURATION_NORMAL`（且为 Wokwi 测试秒级）。
-  - **低电量保护未形成“策略闭环”**：存在 `isBatteryHealthy()`，但业务流程中未见在关键路径（上报/拍照/定位前）统一决策“降级/跳过耗电操作/延长休眠”。
+  - ~~**心跳间隔未按 `HEARTBEAT_INTERVAL_SEC` 执行**~~ ✅ **已完成**（2026-01-04）：`Settings.h` 使用条件编译统一为 `HEARTBEAT_INTERVAL_SEC`（Mock=5s / Real=3600s），`WorkflowManager.h` 所有 `deepSleep()` 调用已更新。
+  - **低电量保护未形成"策略闭环"**：存在 `isBatteryHealthy()`，但业务流程中未见在关键路径（上报/拍照/定位前）统一决策"降级/跳过耗电操作/延长休眠"。
   - **太阳能充电/充电状态检测未实现**：代码中未见太阳能充电 IC 状态检测、充电电流/电压采样、充放电策略等。
-  - **5天续航的量化与验证未实现**：缺少能耗模型（休眠电流、4G峰值、电池容量、阴雨发电量），也缺少“极端情况下只发最小心跳/不上图”的降级策略。
+  - **5天续航的量化与验证未实现**：缺少能耗模型（休眠电流、4G峰值、电池容量、阴雨发电量），也缺少"极端情况下只发最小心跳/不上图"的降级策略。
 
 ### （2）倾斜检测：倾斜 > 5° 告警
 
@@ -44,7 +44,12 @@
   - 轮询检测与报警：`src/core/WorkflowManager.h`：`handleTimerWakeup()` 中 `relativeAngle > TILT_THRESHOLD` → `sendTiltAlarmWithPhoto()`
   - 倾斜角计算：`src/modules/real/LSM6DS3_Sensor.h`：`readData()`（基于加速度 `atan2` 计算 Pitch/Roll，输出相对偏移）
 - **缺口/未实现**：
-  - **倾斜中断唤醒（EXT1）未实现**：`src/main.cpp`：`ESP_SLEEP_WAKEUP_EXT1` 分支打印“未实现”。
+  - **倾斜中断唤醒（EXT1）未实现**：`src/main.cpp`：`ESP_SLEEP_WAKEUP_EXT1` 分支打印"未实现"。
+  - **INT1 数据就绪中断未被利用**：
+    - LSM6DS3 已配置 INT1 引脚输出 26Hz 数据就绪信号到 GPIO 10
+    - 主程序采用轮询方式 (`readData()`)，完全忽略 INT1 信号
+    - 缺少 ESP32 中断配置 (`attachInterrupt`)、ISR、深度睡眠唤醒配置
+    - **结果**：设计意图"节省功耗"未达成，INT1 中断配置是半成品
   - `TILT_DEBOUNCE_COUNT`/`TILT_SAMPLE_INTERVAL_MS` 目前未在业务流程中形成明显的防抖采样逻辑（需要确认是否要按需求实现）。
 
 ### （3）电量监测 + 摄像头模块，具有拍照功能
@@ -109,7 +114,13 @@
   - `set_interval`：`// TODO: 解析 value 并修改定时器`
   - `capture`：`// TODO: 触发拍照流程`
 - **`src/main.cpp`**
-  - `ESP_SLEEP_WAKEUP_EXT1` 分支：输出“倾斜中断唤醒（未实现）”
+  - `ESP_SLEEP_WAKEUP_EXT1` 分支：输出"倾斜中断唤醒（未实现）"
+- **`src/modules/real/LSM6DS3_Sensor.h`**
+  - **INT1 中断未被利用**：硬件已配置 INT1 数据就绪中断(26Hz)，但主程序采用轮询方式读取，未实现：
+    - ESP32 GPIO 中断配置 (`attachInterrupt`)
+    - 中断服务程序 (ISR)
+    - ESP32 深度睡眠唤醒源配置 (`esp_sleep_enable_ext0_wakeup`)
+  - 设计意图是"节省功耗"，实际未达成
 
 ## docs/ 文档中的未勾选清单项（- [ ]）
 
@@ -134,9 +145,9 @@
      - `capture`（立即拍照上传，并带上原因/时间戳）
      - `query_battery`（下一次状态上报包含电量详情）
 
-3. **把“低功耗”从示例变为可验证方案**
+3. **把"低功耗"从示例变为可验证方案**
    - 切换为真实硬件配置（`USE_MOCK_HARDWARE=0`、`ENABLE_DEEP_SLEEP=1`）
-   - 用 `HEARTBEAT_INTERVAL_SEC` 驱动休眠周期
+   - ~~用 `HEARTBEAT_INTERVAL_SEC` 驱动休眠周期~~ ✅ **已完成**（2026-01-04）
    - 增加电量策略：低电量时禁用拍照/定位/降低上报频率
    - 明确太阳能充电检测/充电状态输入（硬件引脚/ADC）并实现
 

@@ -70,7 +70,7 @@ public:
         // 1. 读取倾角（相对于初始位置的偏移）
         float relativeAngle = readTiltAngle();
         if (relativeAngle < 0) {
-            SystemManager::deepSleep(SLEEP_DURATION_NORMAL);
+            SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
             return;
         }
         
@@ -109,7 +109,7 @@ public:
         sendStatusHeartbeat(relativeAngle, batteryVoltage);
         
         DEBUG_PRINTLN("[MAIN] ✓ 心跳完成，进入休眠\n");
-        SystemManager::deepSleep(SLEEP_DURATION_NORMAL);
+        SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
     }
     
     /**
@@ -133,7 +133,7 @@ public:
                 audioSensor->sleep();
                 DeviceFactory::destroy(audioSensor);
             }
-            SystemManager::deepSleep(SLEEP_DURATION_NORMAL);
+            SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
             return;
         }
         
