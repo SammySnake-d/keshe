@@ -114,7 +114,7 @@ public:
      * @brief 销毁实例
      */
     template<typename T>
-    static void destroy(T* instance) {
+    static void destroy(T*& instance) {
         if (instance != nullptr) {
             delete instance;
             instance = nullptr;

@@ -33,7 +33,7 @@ extern LSM6DS3 imu;
 void test_real_i2c_communication() {
     Serial.println("\n[TEST] Real: I2C 通信");
     
-    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+    Wire.begin(PIN_LSM_SDA, PIN_LSM_SCL);
     Wire.setClock(400000);
     
     // 扫描 I2C 设备

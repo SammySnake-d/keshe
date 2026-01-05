@@ -12,12 +12,12 @@
 #define DEVICE_ID                   "POLE_001"  // 设备唯一标识（生产时替换为实际ID）
 
 // --- 核心模式开关 ---
-#define USE_MOCK_HARDWARE   1     // 1=仿真模式, 0=真实硬件
+#define USE_MOCK_HARDWARE   0     // 1=仿真模式, 0=真实硬件 ← 改成 0
 
 // --- 功能裁剪开关 ---
 #define ENABLE_CAMERA       1     // 是否启用摄像头
 #define ENABLE_GPS          1     // 是否启用GPS
-#define ENABLE_DEEP_SLEEP   0     // 深度睡眠（Wokwi 不支持 RTC 内存！改用 delay 模拟）
+#define ENABLE_DEEP_SLEEP   1     // 深度睡眠 ← 真机改成 1，启用低功耗模式
 
 // ==================== 调试宏 ====================
 #define DEBUG_SERIAL_ENABLE         1       // 串口调试输出

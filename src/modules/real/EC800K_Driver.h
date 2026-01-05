@@ -80,7 +80,7 @@ public:
         DEBUG_PRINTF("[EC800K] 上传图片 (%d bytes)...\n", imageSize);
         String url = String("http://") + HTTP_SERVER_HOST + HTTP_API_IMAGE;
         if (metadata) url += "?meta=" + String(metadata);
-        return httpPost(url.c_str(), (const char*)imageData, imageSize, "image/jpeg", nullptr, 0);
+        return httpPost(url.c_str(), reinterpret_cast<const char*>(imageData), imageSize, "image/jpeg", nullptr, 0);
     }
     
     void sleep() override {
@@ -148,7 +148,7 @@ private:
         }
         
         // 4. 直接发送原始二进制数据 (Raw Binary)
-        modemSerial.write((const uint8_t*)data, dataLen);
+        modemSerial.write(reinterpret_cast<const uint8_t*>(data), dataLen);
         
         if (!waitForResponse("OK", 2000)) {
             DEBUG_PRINTLN("[EC800K] ❌ 数据发送失败");

@@ -43,12 +43,13 @@ private:
     /**
      * @brief 写寄存器（I2C）
      */
-    void writeRegister(uint8_t reg, uint8_t value) {
+    bool writeRegister(uint8_t reg, uint8_t value) {
         Wire.beginTransmission(0x6A);  // LSM6DS3 I2C 地址（SDO=0）
         Wire.write(reg);
         Wire.write(value);
-        Wire.endTransmission();
+        uint8_t error = Wire.endTransmission();
         delay(5);
+        return (error == 0);  // 0 = 成功
     }
     
     /**
@@ -69,11 +70,17 @@ private:
         DEBUG_PRINTLN("[LSM6DS3] 配置数据就绪中断...");
         
         // 启动加速度计（26 Hz, ±2g）
-        writeRegister(LSM6DS3_CTRL1_XL, 0x20);
+        if (!writeRegister(LSM6DS3_CTRL1_XL, 0x20)) {
+            DEBUG_PRINTLN("[LSM6DS3]   ❌ 加速度计配置失败");
+            return false;
+        }
         DEBUG_PRINTLN("[LSM6DS3]   ✓ 加速度计已启动 (26Hz, ±2g)");
         
         // 路由数据就绪信号到 INT1
-        writeRegister(LSM6DS3_INT1_CTRL, INT1_DRDY_XL_BIT);
+        if (!writeRegister(LSM6DS3_INT1_CTRL, INT1_DRDY_XL_BIT)) {
+            DEBUG_PRINTLN("[LSM6DS3]   ❌ 中断配置失败");
+            return false;
+        }
         DEBUG_PRINTLN("[LSM6DS3]   ✓ 数据就绪中断已配置到 INT1");
         
         return true;
@@ -84,7 +91,7 @@ public:
         DEBUG_PRINTLN("[LSM6DS3] 初始化中...");
         
         // I2C 总线初始化
-        Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+        Wire.begin(PIN_LSM_SDA, PIN_LSM_SCL);
         Wire.setClock(400000);  // 400 kHz
         
         // 初始化传感器

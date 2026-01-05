@@ -93,7 +93,7 @@ void dispatchWakeupHandler() {
         case ESP_SLEEP_WAKEUP_EXT1:
             // 外部中断 1：倾斜中断（GPIO 10，未来启用）
             DEBUG_PRINTLN("\n[MAIN] 📐 倾斜中断唤醒（未实现）");
-            SystemManager::deepSleep(SLEEP_DURATION_NORMAL);
+            SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
             break;
             
         case ESP_SLEEP_WAKEUP_UNDEFINED:
@@ -101,7 +101,7 @@ void dispatchWakeupHandler() {
             // 首次启动或复位：执行校准
             SystemManager::readBatteryVoltage(); // 首次读取显示电压
             WorkflowManager::handleFirstBoot();
-            SystemManager::deepSleep(SLEEP_DURATION_NORMAL);
+            SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
             break;
     };
 }

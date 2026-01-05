@@ -99,7 +99,7 @@ struct NoiseAlarmPayload {
     NoiseAlarmPayload() : voltage(0.0f), soundLevel(0), soundPercent(0), 
                           hasGps(false), location(), timestamp(0) {}
     
-    NoiseAlarmPayload(float vol, uint16_t level = 0) 
+    explicit NoiseAlarmPayload(float vol, uint16_t level = 0) 
         : voltage(vol), soundLevel(level), soundPercent(map(level, 0, 4095, 0, 100)),
           hasGps(false), location(), timestamp(millis()) {}
     

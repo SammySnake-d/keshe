@@ -14,8 +14,9 @@
 // [I2C 总线] (摄像头与IMU共用)
 // U1.10 -> IO17
 // U1.11 -> IO18
-#define PIN_I2C_SDA         17
-#define PIN_I2C_SCL         18
+
+#define PIN_I2C_BUS0_SDA    17
+#define PIN_I2C_BUS0_SCL    18
 
 // [模块 1: 摄像头 OV2640]
 // 电源控制: U1.16 -> IO46
@@ -46,8 +47,8 @@
 #define PIN_CAM_VSYNC       48
 #define PIN_CAM_HREF        47
 #define PIN_CAM_PCLK        45  // 对应网表 'CAM_DCLK' (U1.26)
-#define PIN_CAM_SIOD        17  // I2C SDA
-#define PIN_CAM_SIOC        18  // I2C SCL
+#define PIN_CAM_SIOD        PIN_I2C_BUS0_SDA // I2C SDA
+#define PIN_CAM_SIOC        PIN_I2C_BUS0_SCL  // I2C SCL
 
 // [模块 2: 4G 模块 EC800K]
 // U1.5  -> IO5
@@ -82,6 +83,10 @@
 
 // [模块 5: LSM6DS3 倾斜传感器]
 // I2C 通信 (GPIO 17/18)
+
+#define PIN_LSM_SDA        PIN_I2C_BUS0_SDA
+#define PIN_LSM_SCL        PIN_I2C_BUS0_SCL
+
 
 // ==========================================
 // 🔧 扩展与未使用 (Extensions)
