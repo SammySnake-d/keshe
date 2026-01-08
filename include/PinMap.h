@@ -61,12 +61,11 @@
 // [模块 3: GPS 模块 ATGM336H]
 // U1.6  -> IO6
 // U1.7  -> IO7
-// U1.39 -> IO1 (注意: U1.39是物理脚，对应IO1)
-#define PIN_GPS_TX 6 // ESP32_RX
-#define PIN_GPS_RX 7 // ESP32_TX
-// ⚠️ GPS电源与摄像头PWDN共用 GPIO 46 (互斥: PWDN=1/GPS=ON ?)
-// 需要在逻辑中处理: 打开 GPS 时可能会关闭摄像头 (PWDN=1)
-#define PIN_GPS_PWR 1 // 原为 1 (用户确认保留为 1，尽管 46 是 PWDN)
+// U1.39 -> IO1
+// 接线：ESP32 GPIO6 ← GPS RX，ESP32 GPIO7  → GPS TX
+#define PIN_GPS_RX 6      // ESP32 的 RX 引脚（接收 GPS 数据）
+#define PIN_GPS_TX 7      // ESP32 的 TX 引脚（发送到 GPS）
+#define PIN_GPS_PWR 1     // GPS 电源控制引脚
 
 // [模块 4: 传感器与交互]
 // 声音传感器 (模拟信号输出)

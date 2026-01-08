@@ -45,8 +45,8 @@ public:
     delay(100);
 
     // 3. 初始化 UART2 (9600bps, 8N1)
-    // ESP32 的 Serial2: RX=PIN_GPS_TX(GPIO6), TX=PIN_GPS_RX(GPIO7)
-    gpsSerial.begin(9600, SERIAL_8N1, PIN_GPS_TX, PIN_GPS_RX);
+    // Arduino HardwareSerial: begin(baud, config, RX_PIN, TX_PIN)
+    gpsSerial.begin(9600, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
 
     // 4. 等待模块启动稳定
     delay(1000);
