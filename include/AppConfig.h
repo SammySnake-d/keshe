@@ -18,6 +18,7 @@
 #define ENABLE_CAMERA       1     // 是否启用摄像头
 #define ENABLE_GPS          1     // 是否启用GPS
 #define ENABLE_DEEP_SLEEP   1     // 深度睡眠 ← 真机改成 1，启用低功耗模式
+#define LSM6DS3_USE_INTERRUPT 0   // 1=使用 INT1/INT2 引脚, 0=轮询读取
 
 // ==================== 调试宏 ====================
 #define DEBUG_SERIAL_ENABLE         1       // 串口调试输出

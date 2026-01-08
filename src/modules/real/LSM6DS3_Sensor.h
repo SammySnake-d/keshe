@@ -39,6 +39,7 @@ private:
     LSM6DS3 imu;
     float initialPitch = 0.0f;  // 零点校准的初始角度
     float initialRoll = 0.0f;
+    bool interruptEnabled = false;
     
     /**
      * @brief 写寄存器（I2C）
@@ -101,16 +102,27 @@ public:
         }
         
         DEBUG_PRINTLN("[LSM6DS3] ✓ 基本初始化成功");
-        
-        // 配置数据就绪中断
-        if (!enableDataReadyInterrupt()) {
-            DEBUG_PRINTLN("[LSM6DS3] ⚠️  数据就绪中断配置失败");
-            return false;
-        }
-        
-        // 配置 INT1 引脚
-        pinMode(PIN_LSM6DS3_INT1, INPUT);
-        DEBUG_PRINTF("[LSM6DS3] INT1 引脚: GPIO %d\n", PIN_LSM6DS3_INT1);
+
+        #if LSM6DS3_USE_INTERRUPT
+            // 配置数据就绪中断
+            if (!enableDataReadyInterrupt()) {
+                DEBUG_PRINTLN("[LSM6DS3] ⚠️  数据就绪中断配置失败");
+                return false;
+            }
+
+            // 配置 INT1 引脚
+            pinMode(PIN_LSM6DS3_INT1, INPUT);
+            DEBUG_PRINTF("[LSM6DS3] INT1 引脚: GPIO %d\n", PIN_LSM6DS3_INT1);
+            interruptEnabled = true;
+        #else
+            // 轮询模式：只需保证加速度计在工作（26 Hz, ±2g）
+            if (!writeRegister(LSM6DS3_CTRL1_XL, 0x20)) {
+                DEBUG_PRINTLN("[LSM6DS3]   ❌ 加速度计配置失败");
+                return false;
+            }
+            DEBUG_PRINTLN("[LSM6DS3] ✓ 轮询模式 (未使用 INT 引脚)");
+            interruptEnabled = false;
+        #endif
         
         return true;
     }
@@ -173,6 +185,9 @@ public:
      * @brief 检查 INT1 引脚状态
      */
     bool isInterruptActive() {
+        if (!interruptEnabled) {
+            return false;
+        }
         return digitalRead(PIN_LSM6DS3_INT1) == HIGH;
     }
     
