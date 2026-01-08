@@ -110,12 +110,18 @@ public:
   }
 
   void sleep() override {
+#if WIFI_KEEP_ALIVE
+    // 保持连接模式：不关闭 WiFi（适用于测试或热点场景）
+    DEBUG_PRINTLN("[WiFi] 保持连接 (WIFI_KEEP_ALIVE=1)");
+#else
+    // 省电模式：关闭 WiFi
     if (connected) {
       DEBUG_PRINTLN("[WiFi] 关闭 WiFi");
       WiFi.disconnect(true);
       WiFi.mode(WIFI_OFF);
       connected = false;
     }
+#endif
   }
 
 private:

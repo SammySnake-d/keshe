@@ -39,6 +39,7 @@
 // ╚══════════════════════════════════════════════════════════════════╝
 #define WIFI_SSID "zhoujiayi"         // WiFi 名称
 #define WIFI_PASSWORD "zhoujiayi" // WiFi 密码
+#define WIFI_KEEP_ALIVE 1             // 1=保持WiFi连接(测试/热点), 0=用完关闭(省电)
 
 // 巴法云配置 (参考 project-name/main/bemfa_client.c)
 #define BEMFA_USER_KEY "e40a3c7f54544bfcb16937f71f3c95e6"

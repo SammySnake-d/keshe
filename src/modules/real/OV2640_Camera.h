@@ -89,6 +89,7 @@ public:
     config.pin_d3 = PIN_CAM_D3;
     config.pin_d4 = PIN_CAM_D4;
     config.pin_d5 = PIN_CAM_D5;
+    config.pin_d6 = PIN_CAM_D6;  // 之前漏掉了！
     config.pin_d7 = PIN_CAM_D7;
     config.pin_xclk = -1; // 使用外部晶振
     config.pin_pclk = PIN_CAM_PCLK;

@@ -330,6 +330,7 @@ private:
     }
 
     DEBUG_PRINTF("[MAIN] 📤 发送 %s 报警数据\n", type);
+    DEBUG_PRINTF("[MAIN] 📦 上报内容: %s\n", alarmJson.c_str());
 
     // 5. 发送数据
     char serverResponse[256] = {0};
@@ -379,6 +380,8 @@ private:
     }
 
     String statusJson = statusData.toJson();
+    DEBUG_PRINTLN("[MAIN] 📤 发送心跳数据");
+    DEBUG_PRINTF("[MAIN] 📦 上报内容: %s\n", statusJson.c_str());
 
     // 4. 发送状态并接收服务器响应（HTTP 捎带下行指令）
     char serverResponse[256] = {0};
