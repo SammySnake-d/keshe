@@ -46,15 +46,20 @@ void setup() {
 }
 
 void loop() {
-#if !ENABLE_DEEP_SLEEP && USE_MOCK_HARDWARE
-  // Wokwi 模拟模式：在 loop 中模拟唤醒周期
-  // deepSleep() 返回后会进入这里，模拟下一次唤醒
-
-  // 模拟定时器唤醒
+#if !ENABLE_DEEP_SLEEP
+  // 测试模式：循环执行心跳流程
+  static bool firstLoopDone = false;
+  
+  if (!firstLoopDone) {
+    DEBUG_PRINTLN("\n[MAIN] 🔧 测试模式：进入循环心跳");
+    firstLoopDone = true;
+  }
+  
+  // 模拟定时器唤醒，执行心跳流程
   wakeupCause = ESP_SLEEP_WAKEUP_TIMER;
   SystemManager::printWakeupReason();
   dispatchWakeupHandler();
-  // dispatchWakeupHandler 内部会调用 deepSleep()，延迟后返回这里
+  // dispatchWakeupHandler 内部会调用 deepSleep()，在测试模式下只是短延迟
 #else
   // 真实硬件模式：loop 永远不会执行（深度睡眠后重启）
   delay(10000);

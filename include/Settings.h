@@ -37,8 +37,8 @@
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║                    📡 WiFi & Bemfa Cloud                           ║
 // ╚══════════════════════════════════════════════════════════════════╝
-#define WIFI_SSID "Your_SSID"         // WiFi 名称
-#define WIFI_PASSWORD "Your_Password" // WiFi 密码
+#define WIFI_SSID "zhoujiayi"         // WiFi 名称
+#define WIFI_PASSWORD "zhoujiayi" // WiFi 密码
 
 // 巴法云配置 (参考 project-name/main/bemfa_client.c)
 #define BEMFA_USER_KEY "e40a3c7f54544bfcb16937f71f3c95e6"
@@ -95,9 +95,10 @@
 #define SLEEP_DURATION_LOW_BAT 10 // 低电量休眠时长 (秒)
 #define SLEEP_DURATION_ALARM 3    // 报警后短休眠 (秒)
 #else
-#define HEARTBEAT_INTERVAL_SEC 3600 // 真实硬件: 1小时心跳
+#define HEARTBEAT_INTERVAL_SEC 3600 // 真实硬件: 1小时心跳 (禁用睡眠时此值用于模拟延迟)
 #define SLEEP_DURATION_LOW_BAT 7200 // 低电量休眠: 2小时
 #define SLEEP_DURATION_ALARM 60     // 报警后短休眠: 1分钟
+#define TEST_LOOP_DELAY_SEC 10      // 测试模式循环延迟 (秒)
 #endif
 
 // ╔══════════════════════════════════════════════════════════════════╗

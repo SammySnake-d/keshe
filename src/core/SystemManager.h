@@ -92,13 +92,10 @@ public:
     DEBUG_PRINTLN("[SYS] 系统休眠中... ZZZ");
     esp_deep_sleep_start();
 #else
-                // Wokwi 模拟模式：使用短循环代替长 delay（避免看门狗超时）
-    DEBUG_PRINTLN("[SYS] 🔧 Wokwi 模式：模拟休眠（保持内存）");
-    for (uint32_t i = 0; i < seconds; i++) {
-      delay(1000); // 每秒喂一次狗
-      yield();     // 让出 CPU，避免看门狗
-    }
-    DEBUG_PRINTLN("[SYS] ⏰ 定时器唤醒（模拟）\n");
+    // 测试模式：短延迟后继续执行（方便调试）
+    DEBUG_PRINTLN("[SYS] 🔧 测试模式：跳过深度睡眠");
+    DEBUG_PRINTLN("[SYS] ⏳ 等待 5 秒后继续...\n");
+    delay(5000);  // 固定 5 秒延迟，方便观察日志
     // 返回后让程序自然进入 loop()
 #endif
   }
