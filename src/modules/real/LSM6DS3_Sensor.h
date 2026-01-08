@@ -65,13 +65,55 @@ public:
   bool init() override {
     DEBUG_PRINTLN("[LSM6DS3] 初始化中...");
 
-    // I2C 总线初始化
-    Wire.begin(PIN_LSM_SDA, PIN_LSM_SCL);
-    Wire.setClock(400000); // 400 kHz
+    // ========================================
+    // 关键修复：ESP32-S3 + SparkFun 库兼容性
+    // ========================================
+    // SparkFun 库的 begin() 会调用 Wire.begin()，但不带参数
+    // 在 ESP32-S3 上，必须先用正确的引脚初始化 Wire
+    
+    // 1. 先结束可能存在的 Wire 实例（避免 "Bus already started" 警告）
+    Wire.end();
+    delay(10);
+    
+    // 2. 用正确的引脚初始化 I2C
+    if (!Wire.begin(PIN_LSM_SDA, PIN_LSM_SCL, 100000)) {
+      DEBUG_PRINTLN("[LSM6DS3] ❌ I2C 总线初始化失败！");
+      return false;
+    }
+    DEBUG_PRINTF("[LSM6DS3] I2C 初始化: SDA=%d, SCL=%d\n", PIN_LSM_SDA, PIN_LSM_SCL);
+    
+    // 等待 I2C 总线稳定
+    delay(100);
 
-    // 初始化传感器
+    // 3. 先扫描 I2C 总线，确认设备存在
+    DEBUG_PRINTLN("[LSM6DS3] 扫描 I2C 总线...");
+    bool found = false;
+    for (uint8_t addr = 0x6A; addr <= 0x6B; addr++) {
+      Wire.beginTransmission(addr);
+      uint8_t error = Wire.endTransmission();
+      if (error == 0) {
+        DEBUG_PRINTF("[LSM6DS3] ✓ 发现设备: 0x%02X\n", addr);
+        imu.settings.I2CAddress = addr;
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) {
+      DEBUG_PRINTLN("[LSM6DS3] ❌ 未发现 I2C 设备！请检查接线:");
+      DEBUG_PRINTF("  - SDA 应连接到 GPIO %d\n", PIN_LSM_SDA);
+      DEBUG_PRINTF("  - SCL 应连接到 GPIO %d\n", PIN_LSM_SCL);
+      DEBUG_PRINTLN("  - 确认 LSM6DS3 供电正常");
+      return false;
+    }
+
+    // 4. 配置 SparkFun 库
+    imu.settings.commInterface = I2C_MODE;
+    // I2CAddress 已在扫描时设置
+
+    // 5. 初始化传感器（SparkFun 库会再次调用 Wire.begin，但引脚已锁定）
     if (imu.begin() != 0) {
-      DEBUG_PRINTLN("[LSM6DS3] ❌ 初始化失败！");
+      DEBUG_PRINTLN("[LSM6DS3] ❌ SparkFun 库初始化失败！");
       return false;
     }
 
