@@ -62,9 +62,9 @@
 // U1.6  -> IO6
 // U1.7  -> IO7
 // U1.39 -> IO1
-// 接线：ESP32 GPIO6 ← GPS RX，ESP32 GPIO7  → GPS TX
-#define PIN_GPS_RX 6      // ESP32 的 RX 引脚（接收 GPS 数据）
-#define PIN_GPS_TX 7      // ESP32 的 TX 引脚（发送到 GPS）
+// 接线：ESP32 GPIO6 (TX) → GPS RX，ESP32 GPIO7 (RX) ← GPS TX
+#define PIN_GPS_RX 7      // ESP32 的 RX 引脚（接收 GPS 数据）← GPIO7
+#define PIN_GPS_TX 6      // ESP32 的 TX 引脚（发送到 GPS）→ GPIO6
 #define PIN_GPS_PWR 1     // GPS 电源控制引脚
 
 // [模块 4: 传感器与交互]

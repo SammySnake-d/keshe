@@ -31,25 +31,28 @@ private:
   }
 
 public:
-  ATGM336H_Driver() : gpsSerial(2), isPowered(false) {}
+  ATGM336H_Driver() : gpsSerial(1), isPowered(false) {}  // 使用 UART1
 
   bool init() override {
     DEBUG_PRINTLN("[ATGM336H] 初始化中...");
 
     // 1. 配置电源控制引脚
     pinMode(PIN_GPS_PWR, OUTPUT);
+    DEBUG_PRINTF("[ATGM336H] 电源引脚: GPIO%d\n", PIN_GPS_PWR);
 
     // 2. 上电（P-MOS：拉低导通）
     digitalWrite(PIN_GPS_PWR, LOW);
     isPowered = true;
-    delay(100);
+    DEBUG_PRINTLN("[ATGM336H] 电源已开启 (P-MOS LOW)");
+    delay(500);  // 增加等待时间
 
-    // 3. 初始化 UART2 (9600bps, 8N1)
+    // 3. 初始化 UART1 (9600bps, 8N1)
     // Arduino HardwareSerial: begin(baud, config, RX_PIN, TX_PIN)
+    DEBUG_PRINTF("[ATGM336H] 串口配置: RX=GPIO%d, TX=GPIO%d\n", PIN_GPS_RX, PIN_GPS_TX);
     gpsSerial.begin(9600, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
 
     // 4. 等待模块启动稳定
-    delay(1000);
+    delay(2000);  // 增加到 2 秒，与测试代码一致
 
     DEBUG_PRINTLN("[ATGM336H] ✓ 初始化成功，波特率 9600");
     DEBUG_PRINTLN("[ATGM336H] ⚠️  请确保天线放置在室外空旷处");
@@ -64,20 +67,33 @@ public:
     }
 
     DEBUG_PRINTF("[ATGM336H] 开始定位（超时 %lu 秒）...\n", timeoutMs / 1000);
+    DEBUG_PRINTF("[ATGM336H] 串口配置: RX=GPIO%d, TX=GPIO%d, PWR=GPIO%d\n", 
+                 PIN_GPS_RX, PIN_GPS_TX, PIN_GPS_PWR);
 
     unsigned long startTime = millis();
     bool receivedData = false;
     uint32_t lastCharCount = 0;
+    uint32_t totalChars = 0;
 
     // 清空缓冲区
     while (gpsSerial.available()) {
       gpsSerial.read();
     }
 
+    // 首次等待数据的调试
+    DEBUG_PRINTLN("[ATGM336H] 等待串口数据...");
+
     while (millis() - startTime < timeoutMs) {
       // 读取并解析串口数据
       while (gpsSerial.available() > 0) {
         char c = gpsSerial.read();
+        totalChars++;
+
+        // 首次收到数据时打印
+        if (!receivedData) {
+          DEBUG_PRINTLN("[ATGM336H] ✓ 开始接收数据");
+          receivedData = true;
+        }
 
 // 调试：打印原始数据（可选）
 #ifdef GPS_DEBUG_RAW
@@ -85,15 +101,16 @@ public:
 #endif
 
         gpsParser.encode(c);
-        receivedData = true;
       }
 
       // 定期报告进度
-      if ((millis() - startTime) % 5000 == 0 &&
-          gpsParser.charsProcessed() != lastCharCount) {
-        lastCharCount = gpsParser.charsProcessed();
-        DEBUG_PRINTF("[ATGM336H] 已处理 %u 字符，卫星数 %u\n", lastCharCount,
-                     gpsParser.satellites.value());
+      uint32_t elapsed = millis() - startTime;
+      if (elapsed > 0 && elapsed % 5000 < 20) {
+        if (gpsParser.charsProcessed() != lastCharCount || totalChars > 0) {
+          lastCharCount = gpsParser.charsProcessed();
+          DEBUG_PRINTF("[ATGM336H] 已处理 %u 字符，卫星数 %u，总接收 %u\n", 
+                       lastCharCount, gpsParser.satellites.value(), totalChars);
+        }
       }
 
       // 检查是否定位成功

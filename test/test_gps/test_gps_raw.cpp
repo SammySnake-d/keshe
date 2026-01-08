@@ -13,11 +13,19 @@
 #include <Arduino.h>
 
 // ==================== 配置 ====================
-// 注意：Arduino HardwareSerial.begin(baud, config, RX, TX) 参数顺序是 RX 在前！
-#define ESP32_TX_PIN        6    // ESP32 TX → GPS RX
-#define ESP32_RX_PIN        7    // ESP32 RX ← GPS TX
-#define GPS_PWR_PIN         1    // GPS 电源控制
+// 使用 PinMap.h 中的定义
+#include "../../include/PinMap.h"
+
+// Arduino HardwareSerial.begin(baud, config, RX, TX) 参数顺序是 RX 在前！
+#define ESP32_TX_PIN        PIN_GPS_TX    // ESP32 TX → GPS RX (GPIO6)
+#define ESP32_RX_PIN        PIN_GPS_RX    // ESP32 RX ← GPS TX (GPIO7)
 #define GPS_BAUD_RATE       9600
+
+// 电源引脚测试选项 - 根据原理图，可能是 GPIO1 或 GPIO46
+// project-name (ESP-IDF) 使用 GPIO46，PinMap.h 定义 GPIO1
+// 如果 GPIO1 不工作，尝试改为 46
+#define GPS_PWR_PIN         PIN_GPS_PWR   // 默认使用 PinMap.h 定义 (GPIO1)
+// #define GPS_PWR_PIN      46            // 备选：如果 GPIO1 不工作，取消注释此行
 
 HardwareSerial gpsSerial(1);  // 使用 UART1
 
