@@ -30,21 +30,43 @@
 #endif
 
 class DeviceFactory {
+private:
+  // 单例实例（测试模式下复用，避免重复初始化）
+#if !ENABLE_DEEP_SLEEP
+  static ISensor *_tiltSensor;
+  static IComm *_commModule;
+  static IAudio *_audioSensor;
+  // GPS 和 Camera 每次都重新创建（资源占用大）
+#endif
+
 public:
   /**
    * @brief 创建倾斜传感器实例
    * @return ISensor* 实例指针
    */
   static ISensor *createTiltSensor() {
+#if !ENABLE_DEEP_SLEEP
+    // 测试模式：复用已有实例
+    if (_tiltSensor != nullptr) {
+      DEBUG_PRINTLN("[Factory] 复用传感器: LSM6DS3_Sensor");
+      return _tiltSensor;
+    }
+#endif
+
     DEBUG_PRINT("[Factory] 创建传感器: ");
 
 #if USE_MOCK_HARDWARE
     DEBUG_PRINTLN("MockTiltSensor");
-    return new MockTiltSensor();
+    auto sensor = new MockTiltSensor();
 #else
     DEBUG_PRINTLN("LSM6DS3_Sensor");
-    return new LSM6DS3_Sensor();
+    auto sensor = new LSM6DS3_Sensor();
 #endif
+
+#if !ENABLE_DEEP_SLEEP
+    _tiltSensor = sensor;
+#endif
+    return sensor;
   }
 
   /**
@@ -52,19 +74,28 @@ public:
    * @return IComm* 实例指针
    */
   static IComm *createCommModule() {
+#if !ENABLE_DEEP_SLEEP
+    // 测试模式：复用已有实例
+    if (_commModule != nullptr) {
+      DEBUG_PRINTLN("[Factory] 复用通信模块: WifiComm");
+      return _commModule;
+    }
+#endif
+
     DEBUG_PRINT("[Factory] 创建通信模块: ");
 
 #if USE_MOCK_HARDWARE
     DEBUG_PRINTLN("MockComm");
-    return new MockComm();
+    auto comm = new MockComm();
 #else
-    // 切换为 WiFi 通信模块
-    // 切换为 WiFi 通信模块
     DEBUG_PRINTLN("WifiComm (Bemfa)");
-    return new WifiComm();
-    // DEBUG_PRINTLN("EC800K_Driver");
-    // return new EC800K_Driver();
+    auto comm = new WifiComm();
 #endif
+
+#if !ENABLE_DEEP_SLEEP
+    _commModule = comm;
+#endif
+    return comm;
   }
 
   /**
@@ -88,15 +119,27 @@ public:
    * @return IAudio* 实例指针
    */
   static IAudio *createAudioSensor() {
+#if !ENABLE_DEEP_SLEEP
+    if (_audioSensor != nullptr) {
+      DEBUG_PRINTLN("[Factory] 复用音频传感器: AudioSensor_ADC");
+      return _audioSensor;
+    }
+#endif
+
     DEBUG_PRINT("[Factory] 创建音频传感器: ");
 
 #if USE_MOCK_HARDWARE
     DEBUG_PRINTLN("MockAudioSensor");
-    return new MockAudioSensor();
+    auto audio = new MockAudioSensor();
 #else
     DEBUG_PRINTLN("AudioSensor_ADC");
-    return new AudioSensor_ADC();
+    auto audio = new AudioSensor_ADC();
 #endif
+
+#if !ENABLE_DEEP_SLEEP
+    _audioSensor = audio;
+#endif
+    return audio;
   }
 
   /**
@@ -119,9 +162,24 @@ public:
    * @brief 销毁实例
    */
   template <typename T> static void destroy(T *instance) {
+#if !ENABLE_DEEP_SLEEP
+    // 测试模式：不销毁单例实例（通过地址比较）
+    if ((void*)instance == (void*)_tiltSensor || 
+        (void*)instance == (void*)_commModule || 
+        (void*)instance == (void*)_audioSensor) {
+      return;  // 跳过销毁
+    }
+#endif
     if (instance != nullptr) {
       delete instance;
       instance = nullptr;
     }
   }
 };
+
+// 静态成员初始化
+#if !ENABLE_DEEP_SLEEP
+ISensor *DeviceFactory::_tiltSensor = nullptr;
+IComm *DeviceFactory::_commModule = nullptr;
+IAudio *DeviceFactory::_audioSensor = nullptr;
+#endif

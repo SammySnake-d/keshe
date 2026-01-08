@@ -162,13 +162,23 @@ public:
   }
 
   /**
-   * @brief 获取绝对角度（不考虑校准）
+   * @brief 获取绝对 Pitch 角度（不考虑校准）
    */
   float getAbsolutePitch() {
     float ax = imu.readFloatAccelX();
     float ay = imu.readFloatAccelY();
     float az = imu.readFloatAccelZ();
     return atan2(ax, sqrt(ay * ay + az * az)) * 180.0 / PI;
+  }
+
+  /**
+   * @brief 获取绝对 Roll 角度（不考虑校准）
+   */
+  float getAbsoluteRoll() {
+    float ax = imu.readFloatAccelX();
+    float ay = imu.readFloatAccelY();
+    float az = imu.readFloatAccelZ();
+    return atan2(ay, sqrt(ax * ax + az * az)) * 180.0 / PI;
   }
 
   /**

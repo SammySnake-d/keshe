@@ -31,10 +31,10 @@ public:
       return;
     }
 
-    // 读取初始角度（绝对值）
+    // 读取初始角度（绝对值）- 同时校准 Pitch 和 Roll
     LSM6DS3_Sensor *lsm = static_cast<LSM6DS3_Sensor *>(tiltSensor);
     float initialPitch = lsm->getAbsolutePitch();
-    float initialRoll = 0.0f; // 简化处理，仅校准 Pitch
+    float initialRoll = lsm->getAbsoluteRoll();  // 修复：同时校准 Roll
 
     // 保存到 RTC 内存和传感器对象
     SystemManager::calibrateInitialPose(initialPitch, initialRoll);
@@ -205,11 +205,25 @@ private:
    */
   static float readTiltAngle() {
     ISensor *tiltSensor = DeviceFactory::createTiltSensor();
-    if (!tiltSensor || !tiltSensor->init()) {
-      DEBUG_PRINTLN("[MAIN] ❌ 传感器初始化失败");
-      DeviceFactory::destroy(tiltSensor);
+    if (!tiltSensor) {
+      DEBUG_PRINTLN("[MAIN] ❌ 传感器创建失败");
       return -1.0f;
     }
+    
+    // 检查是否需要初始化（首次或深度睡眠后）
+    static bool sensorInitialized = false;
+#if !ENABLE_DEEP_SLEEP
+    if (!sensorInitialized) {
+#endif
+      if (!tiltSensor->init()) {
+        DEBUG_PRINTLN("[MAIN] ❌ 传感器初始化失败");
+        DeviceFactory::destroy(tiltSensor);
+        return -1.0f;
+      }
+      sensorInitialized = true;
+#if !ENABLE_DEEP_SLEEP
+    }
+#endif
 
     // 恢复零点校准值（从 RTC 内存读取）
     LSM6DS3_Sensor *lsm = static_cast<LSM6DS3_Sensor *>(tiltSensor);
@@ -222,7 +236,9 @@ private:
 
     DEBUG_PRINTF("[MAIN] 📐 相对倾角: %.2f°\n", relativeAngle);
 
+#if ENABLE_DEEP_SLEEP
     tiltSensor->sleep();
+#endif
     DeviceFactory::destroy(tiltSensor);
 
     return relativeAngle;
