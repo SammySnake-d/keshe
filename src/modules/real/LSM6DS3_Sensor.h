@@ -34,30 +34,33 @@
 
 class LSM6DS3_Sensor : public ISensor {
 private:
-  LSM6DS3 imu;
-  float initialPitch = 0.0f; // 零点校准的初始角度
+  // SparkFun 库构造函数: LSM6DS3(uint8_t busType, uint8_t inputArg)
+  // I2C 模式: LSM6DS3(I2C_MODE, i2cAddress)
+  LSM6DS3 imu{I2C_MODE, 0x6A};  // 默认地址 0x6A
+  uint8_t deviceAddr = 0x6A;
+  float initialPitch = 0.0f;
   float initialRoll = 0.0f;
 
   /**
    * @brief 写寄存器（I2C）
    */
   bool writeRegister(uint8_t reg, uint8_t value) {
-    Wire.beginTransmission(0x6A); // LSM6DS3 I2C 地址（SDO=0）
+    Wire.beginTransmission(deviceAddr);
     Wire.write(reg);
     Wire.write(value);
     uint8_t error = Wire.endTransmission();
     delay(5);
-    return (error == 0); // 0 = 成功
+    return (error == 0);
   }
 
   /**
    * @brief 读寄存器（I2C）
    */
   uint8_t readRegister(uint8_t reg) {
-    Wire.beginTransmission(0x6A);
+    Wire.beginTransmission(deviceAddr);
     Wire.write(reg);
     Wire.endTransmission(false);
-    Wire.requestFrom(0x6A, 1);
+    Wire.requestFrom(deviceAddr, (uint8_t)1);
     return Wire.read();
   }
 
@@ -65,13 +68,7 @@ public:
   bool init() override {
     DEBUG_PRINTLN("[LSM6DS3] 初始化中...");
 
-    // ========================================
-    // 关键修复：ESP32-S3 + SparkFun 库兼容性
-    // ========================================
-    // SparkFun 库的 begin() 会调用 Wire.begin()，但不带参数
-    // 在 ESP32-S3 上，必须先用正确的引脚初始化 Wire
-    
-    // 1. 先结束可能存在的 Wire 实例（避免 "Bus already started" 警告）
+    // 1. 先结束可能存在的 Wire 实例
     Wire.end();
     delay(10);
     
@@ -82,10 +79,9 @@ public:
     }
     DEBUG_PRINTF("[LSM6DS3] I2C 初始化: SDA=%d, SCL=%d\n", PIN_LSM_SDA, PIN_LSM_SCL);
     
-    // 等待 I2C 总线稳定
     delay(100);
 
-    // 3. 先扫描 I2C 总线，确认设备存在
+    // 3. 扫描 I2C 总线
     DEBUG_PRINTLN("[LSM6DS3] 扫描 I2C 总线...");
     bool found = false;
     for (uint8_t addr = 0x6A; addr <= 0x6B; addr++) {
@@ -93,7 +89,7 @@ public:
       uint8_t error = Wire.endTransmission();
       if (error == 0) {
         DEBUG_PRINTF("[LSM6DS3] ✓ 发现设备: 0x%02X\n", addr);
-        imu.settings.I2CAddress = addr;
+        deviceAddr = addr;
         found = true;
         break;
       }
@@ -107,11 +103,11 @@ public:
       return false;
     }
 
-    // 4. 配置 SparkFun 库
-    imu.settings.commInterface = I2C_MODE;
-    // I2CAddress 已在扫描时设置
-
-    // 5. 初始化传感器（SparkFun 库会再次调用 Wire.begin，但引脚已锁定）
+    // 4. 重新创建 imu 对象（使用扫描到的地址）
+    // 注意：由于 imu 是成员变量，这里用 placement new 或直接调用 begin
+    // SparkFun 库的 begin() 会使用构造时的地址
+    
+    // 5. 初始化传感器
     if (imu.begin() != 0) {
       DEBUG_PRINTLN("[LSM6DS3] ❌ SparkFun 库初始化失败！");
       return false;
