@@ -89,16 +89,15 @@ public:
     config.pin_d3 = PIN_CAM_D3;
     config.pin_d4 = PIN_CAM_D4;
     config.pin_d5 = PIN_CAM_D5;
-    config.pin_d6 = PIN_CAM_D6;
     config.pin_d7 = PIN_CAM_D7;
-    config.pin_xclk = PIN_CAM_XCLK;
+    config.pin_xclk = -1; // 使用外部晶振
     config.pin_pclk = PIN_CAM_PCLK;
     config.pin_vsync = PIN_CAM_VSYNC;
     config.pin_href = PIN_CAM_HREF;
     config.pin_sccb_sda = PIN_CAM_SIOD;
     config.pin_sccb_scl = PIN_CAM_SIOC;
     config.pin_pwdn = PIN_CAM_PWDN;
-    config.pin_reset = PIN_CAM_RESET;
+    config.pin_reset = -1; // 未连接
     config.xclk_freq_hz = CAM_XCLK_FREQ_HZ;
     config.pixel_format = PIXFORMAT_JPEG;
     // grab_mode 在下面根据 PSRAM 情况设置

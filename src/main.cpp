@@ -26,7 +26,9 @@ void dispatchWakeupHandler();
 
 // ==================== 主程序入口 ====================
 void setup() {
+#if DEBUG_SERIAL_ENABLE
   Serial.begin(115200);
+#endif
   delay(500);
 
   printBootBanner();
