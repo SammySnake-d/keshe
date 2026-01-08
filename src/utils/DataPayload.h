@@ -37,21 +37,31 @@ struct GpsLocation {
 struct TiltAlarmPayload {
     float angle;           // 倾斜角度
     float voltage;         // 电池电压
+    GpsLocation location;  // GPS 坐标（无效时为 0,0）
     unsigned long timestamp; // 时间戳
     
-    TiltAlarmPayload() : angle(0.0f), voltage(0.0f), timestamp(0) {}
+    TiltAlarmPayload() : angle(0.0f), voltage(0.0f), location(), timestamp(0) {}
     TiltAlarmPayload(float ang, float vol) 
-        : angle(ang), voltage(vol), timestamp(millis()) {}
+        : angle(ang), voltage(vol), location(), timestamp(millis()) {}
+    TiltAlarmPayload(float ang, float vol, double lat, double lon) 
+        : angle(ang), voltage(vol), location(lat, lon), timestamp(millis()) {}
     
-    /**
-     * @brief 使用 ArduinoJson 序列化为 JSON 字符串
-     */
+    bool hasValidGps() const { return location.latitude != 0.0 || location.longitude != 0.0; }
+    
     String toJson() const {
         StaticJsonDocument<256> doc;
         doc["type"] = "TILT";
-        doc["angle"] = serialized(String(angle, 2));      // 保留2位小数
-        doc["voltage"] = serialized(String(voltage, 2));  // 保留2位小数
+        doc["angle"] = serialized(String(angle, 2));
+        doc["voltage"] = serialized(String(voltage, 2));
         doc["timestamp"] = timestamp;
+        
+        if (hasValidGps()) {
+            JsonObject locObj = doc.createNestedObject("location");
+            locObj["lat"] = serialized(String(location.latitude, 6));
+            locObj["lon"] = serialized(String(location.longitude, 6));
+        } else {
+            doc["location"] = nullptr;
+        }
         
         String json;
         serializeJson(doc, json);
@@ -64,20 +74,30 @@ struct TiltAlarmPayload {
  */
 struct LowBatteryPayload {
     float voltage;         // 电池电压
+    GpsLocation location;  // GPS 坐标
     unsigned long timestamp; // 时间戳
     
-    LowBatteryPayload() : voltage(0.0f), timestamp(0) {}
+    LowBatteryPayload() : voltage(0.0f), location(), timestamp(0) {}
     explicit LowBatteryPayload(float vol) 
-        : voltage(vol), timestamp(millis()) {}
+        : voltage(vol), location(), timestamp(millis()) {}
+    LowBatteryPayload(float vol, double lat, double lon) 
+        : voltage(vol), location(lat, lon), timestamp(millis()) {}
     
-    /**
-     * @brief 使用 ArduinoJson 序列化为 JSON 字符串
-     */
+    bool hasValidGps() const { return location.latitude != 0.0 || location.longitude != 0.0; }
+    
     String toJson() const {
         StaticJsonDocument<256> doc;
         doc["type"] = "LOW_BATTERY";
-        doc["voltage"] = serialized(String(voltage, 2));  // 保留2位小数
+        doc["voltage"] = serialized(String(voltage, 2));
         doc["timestamp"] = timestamp;
+        
+        if (hasValidGps()) {
+            JsonObject locObj = doc.createNestedObject("location");
+            locObj["lat"] = serialized(String(location.latitude, 6));
+            locObj["lon"] = serialized(String(location.longitude, 6));
+        } else {
+            doc["location"] = nullptr;
+        }
         
         String json;
         serializeJson(doc, json);
@@ -92,24 +112,22 @@ struct NoiseAlarmPayload {
     float voltage;          // 电池电压
     uint16_t soundLevel;    // 声音峰峰值 (0-4095)
     uint8_t soundPercent;   // 声音强度百分比 (0-100)
-    bool hasGps;            // 是否包含 GPS
-    GpsLocation location;   // GPS 坐标（可选）
+    GpsLocation location;   // GPS 坐标
     unsigned long timestamp; // 时间戳
     
     NoiseAlarmPayload() : voltage(0.0f), soundLevel(0), soundPercent(0), 
-                          hasGps(false), location(), timestamp(0) {}
+                          location(), timestamp(0) {}
     
     NoiseAlarmPayload(float vol, uint16_t level = 0) 
         : voltage(vol), soundLevel(level), soundPercent(map(level, 0, 4095, 0, 100)),
-          hasGps(false), location(), timestamp(millis()) {}
+          location(), timestamp(millis()) {}
     
     NoiseAlarmPayload(float vol, uint16_t level, double lat, double lon) 
         : voltage(vol), soundLevel(level), soundPercent(map(level, 0, 4095, 0, 100)),
-          hasGps(true), location(lat, lon), timestamp(millis()) {}
+          location(lat, lon), timestamp(millis()) {}
     
-    /**
-     * @brief 使用 ArduinoJson 序列化为 JSON 字符串
-     */
+    bool hasValidGps() const { return location.latitude != 0.0 || location.longitude != 0.0; }
+    
     String toJson() const {
         StaticJsonDocument<384> doc;
         doc["type"] = "NOISE";
@@ -118,11 +136,12 @@ struct NoiseAlarmPayload {
         doc["soundPercent"] = soundPercent;
         doc["timestamp"] = timestamp;
         
-        // 如果有 GPS 数据，添加 location 字段
-        if (hasGps) {
+        if (hasValidGps()) {
             JsonObject locObj = doc.createNestedObject("location");
             locObj["lat"] = serialized(String(location.latitude, 6));
             locObj["lon"] = serialized(String(location.longitude, 6));
+        } else {
+            doc["location"] = nullptr;
         }
         
         String json;
@@ -139,36 +158,35 @@ struct StatusPayload {
     float voltage;         // 电池电压
     unsigned long uptime;  // 运行时间（秒）
     String version;        // 固件版本
-    bool hasGps;           // 是否包含 GPS 数据
-    GpsLocation location;  // GPS 坐标（可选）
+    GpsLocation location;  // GPS 坐标
     
     StatusPayload() : angle(0.0f), voltage(0.0f), uptime(0), 
-                      version(FIRMWARE_VERSION), hasGps(false), location() {}
+                      version(FIRMWARE_VERSION), location() {}
     
     StatusPayload(float ang, float vol) 
         : angle(ang), voltage(vol), uptime(millis() / 1000), 
-          version(FIRMWARE_VERSION), hasGps(false), location() {}
+          version(FIRMWARE_VERSION), location() {}
     
     StatusPayload(float ang, float vol, double lat, double lon) 
         : angle(ang), voltage(vol), uptime(millis() / 1000), 
-          version(FIRMWARE_VERSION), hasGps(true), location(lat, lon) {}
+          version(FIRMWARE_VERSION), location(lat, lon) {}
     
-    /**
-     * @brief 使用 ArduinoJson 序列化为 JSON 字符串
-     */
+    bool hasValidGps() const { return location.latitude != 0.0 || location.longitude != 0.0; }
+    
     String toJson() const {
         StaticJsonDocument<512> doc;
         doc["type"] = "STATUS";
-        doc["angle"] = serialized(String(angle, 2));      // 保留2位小数
-        doc["voltage"] = serialized(String(voltage, 2));  // 保留2位小数
+        doc["angle"] = serialized(String(angle, 2));
+        doc["voltage"] = serialized(String(voltage, 2));
         doc["uptime"] = uptime;
         doc["version"] = version;
         
-        // 如果有 GPS 数据，添加 location 字段
-        if (hasGps) {
+        if (hasValidGps()) {
             JsonObject locObj = doc.createNestedObject("location");
             locObj["lat"] = serialized(String(location.latitude, 6));
             locObj["lon"] = serialized(String(location.longitude, 6));
+        } else {
+            doc["location"] = nullptr;
         }
         
         String json;

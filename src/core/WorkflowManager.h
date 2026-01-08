@@ -329,9 +329,8 @@ private:
     String alarmJson;
     if (strcmp(type, "tilt") == 0) {
       if (hasGps) {
-        alarmJson = FullAlarmPayload(value, voltage, gpsData.latitude,
-                                     gpsData.longitude)
-                        .toJson();
+        alarmJson = TiltAlarmPayload(value, voltage, gpsData.latitude,
+                                     gpsData.longitude).toJson();
       } else {
         alarmJson = TiltAlarmPayload(value, voltage).toJson();
       }
