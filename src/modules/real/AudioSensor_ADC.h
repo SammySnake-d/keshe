@@ -57,12 +57,15 @@ public:
         return lastPeakToPeak;
     }
     
+    /**
+     * @brief 检测是否有噪音（使用上次读取的值）
+     * @note 调用前应先调用 readPeakToPeak() 获取最新值
+     */
     bool isNoiseDetected() override {
-        uint16_t level = readPeakToPeak();
-        bool detected = level > NOISE_THRESHOLD_HIGH;
+        bool detected = lastPeakToPeak > NOISE_THRESHOLD_HIGH;
         
         if (detected) {
-            DEBUG_PRINTF("[传感器] ⚠️ 噪音: %d > %d\n", level, NOISE_THRESHOLD_HIGH);
+            DEBUG_PRINTF("[传感器] ⚠️ 噪音: %d > %d\n", lastPeakToPeak, NOISE_THRESHOLD_HIGH);
         }
         
         return detected;
@@ -83,6 +86,18 @@ public:
      */
     uint16_t getLastPeakToPeak() const {
         return lastPeakToPeak;
+    }
+    
+    /**
+     * @brief 估算分贝值（仅供参考，未经校准）
+     * @note 基于峰峰值的对数映射，大致范围 30-90 dB
+     *       实际分贝需要专业设备校准
+     */
+    float estimateDb() const {
+        if (lastPeakToPeak <= 1) return 30.0f;  // 静音基准
+        // 对数映射: 峰峰值 1-4095 → 约 30-90 dB
+        float db = 30.0f + 20.0f * log10((float)lastPeakToPeak);
+        return constrain(db, 30.0f, 100.0f);
     }
     
     /**

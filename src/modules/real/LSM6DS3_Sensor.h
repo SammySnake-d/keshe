@@ -111,13 +111,25 @@ public:
 
   /**
    * @brief 读取当前倾斜角度（相对于初始位置）
-   * @return 相对倾斜角度（绝对值）
+   * @return 相对倾斜角度（绝对值），读取失败返回 -1
    */
   float readData() override {
+    // 确保 I2C 总线正常（摄像头使用后可能被破坏）
+    if (!ensureI2CReady()) {
+      DEBUG_PRINTLN("[传感器] ⚠️ I2C 恢复失败");
+      return -1.0f;
+    }
+    
     // 读取加速度计数据（使用 SparkFun 库）
     float ax = imu.readFloatAccelX();
     float ay = imu.readFloatAccelY();
     float az = imu.readFloatAccelZ();
+    
+    // 数据有效性检查（全零或异常值表示读取失败）
+    if (ax == 0.0f && ay == 0.0f && az == 0.0f) {
+      DEBUG_PRINTLN("[传感器] ⚠️ IMU 数据异常（全零）");
+      return -1.0f;
+    }
 
     // 计算当前 Pitch 和 Roll 角度
     float currentPitch = atan2(ax, sqrt(ay * ay + az * az)) * 180.0 / PI;
@@ -130,6 +142,35 @@ public:
     // 返回最大偏移量
     float maxTilt = max(deltaPitch, deltaRoll);
     return maxTilt;
+  }
+  
+  /**
+   * @brief 确保 I2C 总线就绪（摄像头使用后需要恢复）
+   */
+  bool ensureI2CReady() {
+    // 检查设备是否响应
+    Wire.beginTransmission(deviceAddr);
+    if (Wire.endTransmission() == 0) {
+      return true;  // I2C 正常
+    }
+    
+    // I2C 异常，尝试恢复
+    DEBUG_PRINTLN("[传感器] I2C 恢复中...");
+    Wire.end();
+    delay(10);
+    
+    if (!Wire.begin(PIN_LSM_SDA, PIN_LSM_SCL, 100000)) {
+      return false;
+    }
+    delay(50);
+    
+    // 重新初始化 IMU
+    if (imu.begin() != 0) {
+      return false;
+    }
+    writeRegister(LSM6DS3_CTRL1_XL, 0x20);
+    
+    return true;
   }
 
   /**
