@@ -37,12 +37,7 @@ public:
     AudioSensor_ADC() : lastPeakToPeak(0), lastDb(30.0f), initialized(false) {}
     
     bool init() override {
-        // 1. 开启运放偏置（必须！否则麦克风无输出）
-        pinMode(PIN_MIC_CTRL, OUTPUT);
-        digitalWrite(PIN_MIC_CTRL, HIGH);
-        delay(10);  // 等待运放稳定
-        
-        // 2. 配置 ADC
+        // 配置 ADC 读取麦克风模拟信号
         pinMode(PIN_MIC_ANALOG, INPUT);
         analogReadResolution(12);
         analogSetPinAttenuation(PIN_MIC_ANALOG, ADC_11db);
@@ -94,8 +89,7 @@ public:
     }
     
     void sleep() override {
-        // 关闭运放偏置省电
-        digitalWrite(PIN_MIC_CTRL, LOW);
+        // 麦克风电路无需特殊休眠处理
     }
     
     // ========== 扩展方法 ==========
