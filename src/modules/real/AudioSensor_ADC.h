@@ -56,13 +56,19 @@ public:
         
         uint16_t minVal = 4095;
         uint16_t maxVal = 0;
+        uint32_t sum = 0;
         
         for (int i = 0; i < NOISE_SAMPLE_COUNT; i++) {
             uint16_t sample = analogRead(PIN_MIC_ANALOG);
+            sum += sample;
             if (sample > maxVal) maxVal = sample;
             if (sample < minVal) minVal = sample;
             delayMicroseconds(NOISE_SAMPLE_INTERVAL_US);
         }
+        
+        // 调试：输出 ADC 原始值范围
+        uint16_t avg = sum / NOISE_SAMPLE_COUNT;
+        DEBUG_PRINTF("[Audio] ADC: min=%d, max=%d, avg=%d\n", minVal, maxVal, avg);
         
         lastPeakToPeak = maxVal - minVal;
         lastDb = peakToDb(lastPeakToPeak);
