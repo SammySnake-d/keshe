@@ -34,13 +34,10 @@ public:
 
   /**
    * @brief 记录初始姿态（零点校准）
-   * @param pitch 初始俯仰角
-   * @param roll 初始横滚角
    */
   static void calibrateInitialPose(float pitch, float roll) {
-    g_initialPitch = pitch; // 保存到 RTC 内存
+    g_initialPitch = pitch;
     g_initialRoll = roll;
-    DEBUG_PRINTF("[SYS] 零点校准完成: Pitch=%.2f°, Roll=%.2f°\n", pitch, roll);
   }
 
   /**
@@ -78,25 +75,18 @@ public:
    * @param seconds 睡眠时长（秒）
    */
   static void deepSleep(uint32_t seconds) {
-    DEBUG_PRINTF("\n[SYS] 准备进入深度睡眠: %d 秒\n", seconds);
-
-// 清理资源
 #if DEBUG_SERIAL_ENABLE
     Serial.flush();
 #endif
-    delay(100); // 等待串口输出完成
+    delay(100);
 
 #if ENABLE_DEEP_SLEEP
-                // 真实深度睡眠（仅用于真实硬件）
+    DEBUG_PRINTF("[系统] 休眠 %d 秒...\n", seconds);
     esp_sleep_enable_timer_wakeup(seconds * 1000000ULL);
-    DEBUG_PRINTLN("[SYS] 系统休眠中... ZZZ");
     esp_deep_sleep_start();
 #else
-    // 测试模式：短延迟后继续执行（方便调试）
-    DEBUG_PRINTLN("[SYS] 🔧 测试模式：跳过深度睡眠");
-    DEBUG_PRINTLN("[SYS] ⏳ 等待 5 秒后继续...\n");
-    delay(5000);  // 固定 5 秒延迟，方便观察日志
-    // 返回后让程序自然进入 loop()
+    // 测试模式：短延迟后继续
+    delay(5000);
 #endif
   }
 
@@ -118,35 +108,24 @@ public:
    */
   static float readBatteryVoltage() {
 #if USE_MOCK_HARDWARE
-    // Mock: 模拟电压在 3.5V ~ 4.2V 之间波动
-    g_mockVoltage -= 0.05f; // 每次调用下降 0.05V（RTC 持久化）
+    g_mockVoltage -= 0.05f;
     if (g_mockVoltage < 3.3f)
       g_mockVoltage = 4.2f;
-    DEBUG_PRINTF("[SYS] 电池电压 (Mock): %.2fV\n", g_mockVoltage);
     return g_mockVoltage;
 #else
-    // Real: 使用官方校准 API + 多次采样滤波
-
-    // 1. 配置 ADC 衰减（测量 0-3.3V 范围）
     analogSetPinAttenuation(PIN_BAT_ADC, ADC_11db);
 
-    // 2. 多次采样取平均（降低噪声，滤除 4G 模块瞬间掉压）
     const int SAMPLES = 10;
     uint32_t sum_mv = 0;
 
     for (int i = 0; i < SAMPLES; i++) {
-      // 使用 analogReadMilliVolts() 自动校准（考虑芯片个体差异）
       sum_mv += analogReadMilliVolts(PIN_BAT_ADC);
-      delay(5); // 每次采样间隔 5ms
+      delay(5);
     }
 
-    // 3. 计算平均值并转换为实际电池电压
     float avg_mv = sum_mv / (float)SAMPLES;
-    float measured_voltage = avg_mv / 1000.0f;                  // mV -> V
-    float battery_voltage = measured_voltage * BAT_VOLTAGE_DIV; // 还原分压
-
-    DEBUG_PRINTF("[SYS] 电池电压: %.2fV (测量: %.2fV, 平均: %.0fmV)\n",
-                 battery_voltage, measured_voltage, avg_mv);
+    float measured_voltage = avg_mv / 1000.0f;
+    float battery_voltage = measured_voltage * BAT_VOLTAGE_DIV;
 
     return battery_voltage;
 #endif
@@ -200,24 +179,25 @@ public:
   }
 
   /**
-   * @brief 打印唤醒原因
+   * @brief 打印唤醒原因（仅深度睡眠模式有意义）
    */
   static void printWakeupReason() {
+#if ENABLE_DEEP_SLEEP
     esp_sleep_wakeup_cause_t wakeup_reason = getWakeupCause();
 
-    DEBUG_PRINT("[SYS] 唤醒原因: ");
+    DEBUG_PRINT("[系统] 唤醒: ");
     switch (wakeup_reason) {
     case ESP_SLEEP_WAKEUP_EXT0:
-      DEBUG_PRINTLN("GPIO 中断 (声音触发)");
+      DEBUG_PRINTLN("GPIO 中断");
       break;
     case ESP_SLEEP_WAKEUP_TIMER:
-      DEBUG_PRINTLN("定时器唤醒 (心跳检测)");
+      DEBUG_PRINTLN("定时器");
       break;
-    case ESP_SLEEP_WAKEUP_UNDEFINED:
     default:
-      DEBUG_PRINTLN("首次启动 / 复位");
+      DEBUG_PRINTLN("首次启动");
       break;
     }
+#endif
   }
 
 private:

@@ -33,14 +33,9 @@ void setup() {
 
   printBootBanner();
 
-  // 读取唤醒原因
   wakeupCause = esp_sleep_get_wakeup_cause();
-
-  // 启动计数
   bootCount++;
-  DEBUG_PRINTF("\n[MAIN] 🔢 启动计数: %lu (RTC 内存保持)\n", bootCount);
 
-  // 分发到对应的处理流程
   SystemManager::printWakeupReason();
   dispatchWakeupHandler();
 }
@@ -48,20 +43,9 @@ void setup() {
 void loop() {
 #if !ENABLE_DEEP_SLEEP
   // 测试模式：循环执行心跳流程
-  static bool firstLoopDone = false;
-  
-  if (!firstLoopDone) {
-    DEBUG_PRINTLN("\n[MAIN] 🔧 测试模式：进入循环心跳");
-    firstLoopDone = true;
-  }
-  
-  // 模拟定时器唤醒，执行心跳流程
   wakeupCause = ESP_SLEEP_WAKEUP_TIMER;
-  SystemManager::printWakeupReason();
   dispatchWakeupHandler();
-  // dispatchWakeupHandler 内部会调用 deepSleep()，在测试模式下只是短延迟
 #else
-  // 真实硬件模式：loop 永远不会执行（深度睡眠后重启）
   delay(10000);
 #endif
 }
@@ -91,25 +75,16 @@ void printBootBanner() {
 void dispatchWakeupHandler() {
   switch (wakeupCause) {
   case ESP_SLEEP_WAKEUP_TIMER:
-    // 定时器唤醒：心跳巡检
     WorkflowManager::handleTimerWakeup();
     break;
 
   case ESP_SLEEP_WAKEUP_EXT0:
-    // 外部中断 0：声音触发（GPIO 8）
     WorkflowManager::handleAudioWakeup();
-    break;
-
-  case ESP_SLEEP_WAKEUP_EXT1:
-    // 外部中断 1：倾斜中断（GPIO 10，未来启用）
-    DEBUG_PRINTLN("\n[MAIN] 📐 倾斜中断唤醒（未实现）");
-    SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
     break;
 
   case ESP_SLEEP_WAKEUP_UNDEFINED:
   default:
-    // 首次启动或复位：执行校准
-    SystemManager::readBatteryVoltage(); // 首次读取显示电压
+    // 首次启动：执行校准
     WorkflowManager::handleFirstBoot();
     SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
     break;

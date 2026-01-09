@@ -100,23 +100,18 @@ public:
 
   /**
    * @brief 声音中断唤醒 - 噪音报警流程
-   * @note 当前硬件为模拟信号输出，此函数仅在添加外部比较器后使用
-   *       正常情况下声音检测由 handleTimerWakeup() 轮询完成
    */
   static void handleAudioWakeup() {
-    DEBUG_PRINTLN("\n[MAIN] 🔊 声音中断唤醒 - 异常音检测");
+    DEBUG_PRINTLN("[报警] 声音中断唤醒");
 
-    // 读取并显示电池状态
     float batteryVoltage = SystemManager::readBatteryVoltage();
     int batteryPercent = SystemManager::getBatteryPercentage();
-    DEBUG_PRINTF("[MAIN] 🔋 电池状态: %.2fV (%d%%)\n", batteryVoltage,
-                 batteryPercent);
+    DEBUG_PRINTF("[巡检] 电池: %.2fV (%d%%)\n", batteryVoltage, batteryPercent);
 
-    // 确认是否真的是声音触发（二次确认）
     IAudio *audioSensor = DeviceFactory::createAudioSensor();
     if (!audioSensor || !audioSensor->init() ||
         !audioSensor->isNoiseDetected()) {
-      DEBUG_PRINTLN("[MAIN] ⚠️ 误触发，返回休眠");
+      DEBUG_PRINTLN("[报警] ⚠️ 误触发");
       if (audioSensor) {
         audioSensor->sleep();
         DeviceFactory::destroy(audioSensor);
@@ -130,8 +125,6 @@ public:
     DeviceFactory::destroy(audioSensor);
 
     sendNoiseAlarmWithPhoto(batteryVoltage, soundLevel);
-
-    DEBUG_PRINTLN("[MAIN] ✓ 声音报警完成，进入休眠\n");
     SystemManager::deepSleep(SLEEP_DURATION_ALARM);
   }
 
@@ -187,17 +180,16 @@ private:
   static float readTiltAngle() {
     ISensor *tiltSensor = DeviceFactory::createTiltSensor();
     if (!tiltSensor) {
-      DEBUG_PRINTLN("[MAIN] ❌ 传感器创建失败");
+      DEBUG_PRINTLN("[传感器] ❌ 创建失败");
       return -1.0f;
     }
     
-    // 检查是否需要初始化（首次或深度睡眠后）
     static bool sensorInitialized = false;
 #if !ENABLE_DEEP_SLEEP
     if (!sensorInitialized) {
 #endif
       if (!tiltSensor->init()) {
-        DEBUG_PRINTLN("[MAIN] ❌ 传感器初始化失败");
+        DEBUG_PRINTLN("[传感器] ❌ 初始化失败");
         DeviceFactory::destroy(tiltSensor);
         return -1.0f;
       }
@@ -206,16 +198,12 @@ private:
     }
 #endif
 
-    // 恢复零点校准值（从 RTC 内存读取）
     LSM6DS3_Sensor *lsm = static_cast<LSM6DS3_Sensor *>(tiltSensor);
     float initialPitch = SystemManager::getInitialPitch();
     float initialRoll = SystemManager::getInitialRoll();
     lsm->calibrate(initialPitch, initialRoll);
 
-    // 读取相对倾角（已经在 readData 中计算相对值）
     float relativeAngle = tiltSensor->readData();
-
-    DEBUG_PRINTF("[MAIN] 📐 相对倾角: %.2f°\n", relativeAngle);
 
 #if ENABLE_DEEP_SLEEP
     tiltSensor->sleep();
