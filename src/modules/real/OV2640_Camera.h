@@ -60,7 +60,7 @@ public:
 
   /**
    * @brief 初始化摄像头
-   * @warning 调用前必须确保 LSM6DS3 已休眠并释放 I2C
+   * @note 复用 IMU 已初始化的 I2C 总线（Port 0）
    */
   bool init() override {
 #if !ENABLE_CAMERA
@@ -89,8 +89,13 @@ public:
     config.pin_pclk = PIN_CAM_PCLK;
     config.pin_vsync = PIN_CAM_VSYNC;
     config.pin_href = PIN_CAM_HREF;
-    config.pin_sccb_sda = PIN_CAM_SIOD;
-    config.pin_sccb_scl = PIN_CAM_SIOC;
+    
+    // 关键：复用已有的 I2C 总线，不重新初始化
+    // 参考 project-name/main/camera_module.c
+    config.sccb_i2c_port = 0;      // 使用 I2C Port 0（与 IMU 共用）
+    config.pin_sccb_sda = -1;      // -1 表示使用已初始化的总线
+    config.pin_sccb_scl = -1;
+    
     config.pin_pwdn = PIN_CAM_PWDN;
     config.pin_reset = -1;
     config.xclk_freq_hz = CAM_XCLK_FREQ_HZ;
