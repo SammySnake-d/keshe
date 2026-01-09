@@ -164,24 +164,22 @@ private:
   /**
    * @brief 检查并执行定时 GPS 上传
    * @param commModule 已初始化的通信模块指针
-   * @note 参考 project-name/main/main.c:163-173
    */
   static void uploadGpsIfNeeded(IComm *commModule) {
+#if !ENABLE_GPS
+    return;  // GPS 已禁用
+#else
     uint32_t now = millis();
 
     // 1. 检查倾斜联动 (倾斜后 30s 内不上传，避免覆盖报警状态)
     if (now - g_last_tilt_trigger_ms < TILT_GPS_SKIP_DURATION_MS) {
-      DEBUG_PRINTLN("[GPS] ⚠️ 近期有倾斜报警，跳过本次 GPS 定时上传");
       return;
     }
 
     // 2. 检查时间间隔 (60s 上传一次)
     if (now - lastGpsUploadTime > GPS_UPLOAD_INTERVAL_MS) {
-      DEBUG_PRINTLN("[GPS] ⏰ 执行定时 GPS 上传...");
-
       GpsData gpsData;
       if (getGpsLocation(gpsData)) {
-        // 构建并发送 GPS 消息 (参考 project-name 格式: "GPS:Lat:...,Lon:...")
         char gpsMsg[64];
         snprintf(gpsMsg, sizeof(gpsMsg), "GPS:Lat:%.6f,Lon:%.6f",
                  gpsData.latitude, gpsData.longitude);
@@ -193,6 +191,7 @@ private:
         lastGpsUploadTime = now;
       }
     }
+#endif
   }
 
 private:
@@ -240,6 +239,10 @@ private:
    * @brief 获取 GPS 定位数据
    */
   static bool getGpsLocation(GpsData &gpsData) {
+#if !ENABLE_GPS
+    // GPS 已禁用
+    return false;
+#else
     IGPS *gps = DeviceFactory::createGpsModule();
     if (!gps || !gps->init()) {
       DeviceFactory::destroy(gps);
@@ -256,6 +259,7 @@ private:
     gps->sleep();
     DeviceFactory::destroy(gps);
     return success;
+#endif
   }
 
   /**

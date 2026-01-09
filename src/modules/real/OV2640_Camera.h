@@ -32,7 +32,6 @@
 #if ENABLE_CAMERA
 #include "esp_camera.h"
 #include "esp_heap_caps.h" // PSRAM 内存管理
-#include <Wire.h>          // I2C 总线管理
 #endif
 
 class OV2640_Camera : public ICamera {
@@ -189,10 +188,6 @@ public:
       initialized = false;
     }
     digitalWrite(PIN_CAM_PWDN, HIGH);
-    
-    // 释放 I2C 总线，让其他设备可以使用
-    Wire.end();
-    delay(10);
 #endif
   }
 
