@@ -151,25 +151,29 @@ struct NoiseAlarmPayload {
 };
 
 /**
- * @brief 状态心跳数据结构体
+ * @brief 状态心跳数据结构体（包含所有传感器信息）
  */
 struct StatusPayload {
     float angle;           // 当前倾斜角度
     float voltage;         // 电池电压
+    uint16_t soundLevel;   // 声音峰峰值 (0-4095)
+    uint8_t soundPercent;  // 声音强度百分比 (0-100)
     unsigned long uptime;  // 运行时间（秒）
     String version;        // 固件版本
     GpsLocation location;  // GPS 坐标
     
-    StatusPayload() : angle(0.0f), voltage(0.0f), uptime(0), 
-                      version(FIRMWARE_VERSION), location() {}
+    StatusPayload() : angle(0.0f), voltage(0.0f), soundLevel(0), soundPercent(0),
+                      uptime(0), version(FIRMWARE_VERSION), location() {}
     
-    StatusPayload(float ang, float vol) 
-        : angle(ang), voltage(vol), uptime(millis() / 1000), 
-          version(FIRMWARE_VERSION), location() {}
+    StatusPayload(float ang, float vol, uint16_t sound = 0) 
+        : angle(ang), voltage(vol), soundLevel(sound), 
+          soundPercent(map(sound, 0, 4095, 0, 100)),
+          uptime(millis() / 1000), version(FIRMWARE_VERSION), location() {}
     
-    StatusPayload(float ang, float vol, double lat, double lon) 
-        : angle(ang), voltage(vol), uptime(millis() / 1000), 
-          version(FIRMWARE_VERSION), location(lat, lon) {}
+    StatusPayload(float ang, float vol, uint16_t sound, double lat, double lon) 
+        : angle(ang), voltage(vol), soundLevel(sound),
+          soundPercent(map(sound, 0, 4095, 0, 100)),
+          uptime(millis() / 1000), version(FIRMWARE_VERSION), location(lat, lon) {}
     
     bool hasValidGps() const { return location.latitude != 0.0 || location.longitude != 0.0; }
     
@@ -178,6 +182,8 @@ struct StatusPayload {
         doc["type"] = "STATUS";
         doc["angle"] = serialized(String(angle, 2));
         doc["voltage"] = serialized(String(voltage, 2));
+        doc["soundLevel"] = soundLevel;
+        doc["soundPercent"] = soundPercent;
         doc["uptime"] = uptime;
         doc["version"] = version;
         

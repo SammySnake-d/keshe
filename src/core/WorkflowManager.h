@@ -63,10 +63,23 @@ public:
     }
     DEBUG_PRINTF("[巡检] 倾角: %.2f°\n", relativeAngle);
 
-    // 2. 检查倾斜阈值
+    // 2. 读取声音
+    uint16_t soundLevel = 0;
+    IAudio *audioSensor = DeviceFactory::createAudioSensor();
+    if (audioSensor && audioSensor->init()) {
+      soundLevel = audioSensor->readPeakToPeak();
+      DEBUG_PRINTF("[巡检] 声音: %d\n", soundLevel);
+    }
+
+    // 3. 检查倾斜阈值
     if (relativeAngle > TILT_THRESHOLD) {
       DEBUG_PRINTF("[报警] 🚨 倾斜: %.2f° > %.2f°\n", relativeAngle, TILT_THRESHOLD);
       g_last_tilt_trigger_ms = millis();
+
+      if (audioSensor) {
+        audioSensor->sleep();
+        DeviceFactory::destroy(audioSensor);
+      }
 
       if (sendTiltAlarmWithPhoto(relativeAngle, batteryVoltage)) {
         SystemManager::deepSleep(SLEEP_DURATION_ALARM);
@@ -74,11 +87,9 @@ public:
       }
     }
 
-    // 3. 检查声音
-    IAudio *audioSensor = DeviceFactory::createAudioSensor();
-    if (audioSensor && audioSensor->init() && audioSensor->isNoiseDetected()) {
+    // 4. 检查声音阈值
+    if (audioSensor && audioSensor->isNoiseDetected()) {
       DEBUG_PRINTLN("[报警] 🚨 异常噪音");
-      uint16_t soundLevel = audioSensor->readPeakToPeak();
       audioSensor->sleep();
       DeviceFactory::destroy(audioSensor);
 
@@ -93,8 +104,8 @@ public:
       }
     }
 
-    // 4. 正常心跳
-    sendStatusHeartbeat(relativeAngle, batteryVoltage);
+    // 5. 正常心跳（包含所有传感器数据）
+    sendStatusHeartbeat(relativeAngle, batteryVoltage, soundLevel);
     SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
   }
 
@@ -315,9 +326,9 @@ private:
   }
 
   /**
-   * @brief 发送状态心跳
+   * @brief 发送状态心跳（包含所有传感器数据）
    */
-  static void sendStatusHeartbeat(float angle, float voltage) {
+  static void sendStatusHeartbeat(float angle, float voltage, uint16_t soundLevel) {
     GpsData gpsData;
     bool hasGps = getGpsLocation(gpsData);
 
@@ -330,9 +341,9 @@ private:
 
     StatusPayload statusData;
     if (hasGps) {
-      statusData = StatusPayload(angle, voltage, gpsData.latitude, gpsData.longitude);
+      statusData = StatusPayload(angle, voltage, soundLevel, gpsData.latitude, gpsData.longitude);
     } else {
-      statusData = StatusPayload(angle, voltage);
+      statusData = StatusPayload(angle, voltage, soundLevel);
     }
 
     String statusJson = statusData.toJson();
