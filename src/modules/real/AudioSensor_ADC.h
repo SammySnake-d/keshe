@@ -37,9 +37,10 @@ public:
     AudioSensor_ADC() : lastPeakToPeak(0), lastDb(30.0f), initialized(false) {}
     
     bool init() override {
+        // 每次都重新配置 ADC（摄像头可能影响 ADC 状态）
         pinMode(PIN_MIC_ANALOG, INPUT);
         analogReadResolution(12);
-        analogSetAttenuation(ADC_11db);
+        analogSetPinAttenuation(PIN_MIC_ANALOG, ADC_11db);
         initialized = true;
         return true;
     }

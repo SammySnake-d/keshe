@@ -72,7 +72,7 @@ public:
       soundLevel = audioSensor->readPeakToPeak();
       AudioSensor_ADC *adcSensor = static_cast<AudioSensor_ADC *>(audioSensor);
       soundDb = adcSensor->getLastDb();
-      DEBUG_PRINTF("[巡检] 声音: %.0f dB\n", soundDb);
+      DEBUG_PRINTF("[巡检] 声音: %.0f dB (峰峰值=%d)\n", soundDb, soundLevel);
     }
 
     // 3. 检查倾斜阈值

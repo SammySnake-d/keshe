@@ -80,7 +80,7 @@
 //   60 dB = 大声说话
 //   70 dB = 非常吵闹
 //   80 dB = 施工噪音
-#define NOISE_THRESHOLD_DB 60        // 噪音报警阈值（分贝）
+#define NOISE_THRESHOLD_DB 45        // 噪音报警阈值（分贝）
 
 // 内部参数（无需修改）
 #define NOISE_SAMPLE_COUNT 50        // 采样次数
