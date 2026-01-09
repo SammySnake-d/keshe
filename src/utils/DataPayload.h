@@ -110,20 +110,19 @@ struct LowBatteryPayload {
  */
 struct NoiseAlarmPayload {
     float voltage;          // 电池电压
-    uint16_t soundLevel;    // 声音峰峰值 (0-4095)
-    uint8_t soundPercent;   // 声音强度百分比 (0-100)
+    float soundDb;          // 声音分贝 (dB)
     GpsLocation location;   // GPS 坐标
     unsigned long timestamp; // 时间戳
     
-    NoiseAlarmPayload() : voltage(0.0f), soundLevel(0), soundPercent(0), 
+    NoiseAlarmPayload() : voltage(0.0f), soundDb(30.0f), 
                           location(), timestamp(0) {}
     
-    NoiseAlarmPayload(float vol, uint16_t level = 0) 
-        : voltage(vol), soundLevel(level), soundPercent(map(level, 0, 4095, 0, 100)),
+    NoiseAlarmPayload(float vol, float db = 30.0f) 
+        : voltage(vol), soundDb(db),
           location(), timestamp(millis()) {}
     
-    NoiseAlarmPayload(float vol, uint16_t level, double lat, double lon) 
-        : voltage(vol), soundLevel(level), soundPercent(map(level, 0, 4095, 0, 100)),
+    NoiseAlarmPayload(float vol, float db, double lat, double lon) 
+        : voltage(vol), soundDb(db),
           location(lat, lon), timestamp(millis()) {}
     
     bool hasValidGps() const { return location.latitude != 0.0 || location.longitude != 0.0; }
@@ -132,8 +131,7 @@ struct NoiseAlarmPayload {
         StaticJsonDocument<384> doc;
         doc["type"] = "NOISE";
         doc["voltage"] = serialized(String(voltage, 2));
-        doc["soundLevel"] = soundLevel;
-        doc["soundPercent"] = soundPercent;
+        doc["soundDb"] = serialized(String(soundDb, 1));
         doc["timestamp"] = timestamp;
         
         if (hasValidGps()) {
@@ -156,23 +154,20 @@ struct NoiseAlarmPayload {
 struct StatusPayload {
     float angle;           // 当前倾斜角度
     float voltage;         // 电池电压
-    uint16_t soundLevel;   // 声音峰峰值 (0-4095)
-    uint8_t soundPercent;  // 声音强度百分比 (0-100)
+    float soundDb;         // 声音分贝 (dB)
     unsigned long uptime;  // 运行时间（秒）
     String version;        // 固件版本
     GpsLocation location;  // GPS 坐标
     
-    StatusPayload() : angle(0.0f), voltage(0.0f), soundLevel(0), soundPercent(0),
+    StatusPayload() : angle(0.0f), voltage(0.0f), soundDb(30.0f),
                       uptime(0), version(FIRMWARE_VERSION), location() {}
     
-    StatusPayload(float ang, float vol, uint16_t sound = 0) 
-        : angle(ang), voltage(vol), soundLevel(sound), 
-          soundPercent(map(sound, 0, 4095, 0, 100)),
+    StatusPayload(float ang, float vol, float db = 30.0f) 
+        : angle(ang), voltage(vol), soundDb(db),
           uptime(millis() / 1000), version(FIRMWARE_VERSION), location() {}
     
-    StatusPayload(float ang, float vol, uint16_t sound, double lat, double lon) 
-        : angle(ang), voltage(vol), soundLevel(sound),
-          soundPercent(map(sound, 0, 4095, 0, 100)),
+    StatusPayload(float ang, float vol, float db, double lat, double lon) 
+        : angle(ang), voltage(vol), soundDb(db),
           uptime(millis() / 1000), version(FIRMWARE_VERSION), location(lat, lon) {}
     
     bool hasValidGps() const { return location.latitude != 0.0 || location.longitude != 0.0; }
@@ -182,8 +177,7 @@ struct StatusPayload {
         doc["type"] = "STATUS";
         doc["angle"] = serialized(String(angle, 2));
         doc["voltage"] = serialized(String(voltage, 2));
-        doc["soundLevel"] = soundLevel;
-        doc["soundPercent"] = soundPercent;
+        doc["soundDb"] = serialized(String(soundDb, 1));
         doc["uptime"] = uptime;
         doc["version"] = version;
         

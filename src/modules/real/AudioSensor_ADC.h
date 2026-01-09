@@ -3,34 +3,38 @@
 /**
  * @file AudioSensor_ADC.h
  * @brief 真实音频传感器实现 - 基于 ADC 模拟信号检测
- * 
- * 硬件电路（来自原理图）：
- *   GMI9767P-58DB (驻极体麦克风)
- *       ↓
- *   LM321S5 (运放放大, 增益由 R8 调节)
- *       ↓
- *   R5 (1kΩ) + C13 (1uF) 低通滤波
- *       ↓
- *   GPIO 8 (ADC1_CH7)
- * 
- * 工作原理：
- *   - 麦克风输出微弱交流信号
- *   - 运放放大后输出 0~3.3V 模拟信号
- *   - 安静时约 1.65V (中点), 有声音时波动
- *   - 通过快速 ADC 采样计算峰峰值
- *   - 峰峰值超过阈值则判定为噪音
  */
 
 #include "../../interfaces/IAudio.h"
 #include "../../../include/PinMap.h"
+#include <math.h>
 
 class AudioSensor_ADC : public IAudio {
 private:
     uint16_t lastPeakToPeak;
+    float lastDb;
     bool initialized;
     
+    /**
+     * @brief 将峰峰值转换为估算分贝（未校准）
+     */
+    float peakToDb(uint16_t peak) {
+        if (peak <= 1) return 30.0f;
+        float db = 30.0f + 20.0f * log10((float)peak);
+        return constrain(db, 30.0f, 100.0f);
+    }
+    
+    /**
+     * @brief 将分贝阈值转换为峰峰值阈值
+     */
+    uint16_t dbToPeak(float db) {
+        // 反向计算: peak = 10^((db - 30) / 20)
+        float peak = pow(10.0f, (db - 30.0f) / 20.0f);
+        return (uint16_t)constrain(peak, 1.0f, 4095.0f);
+    }
+    
 public:
-    AudioSensor_ADC() : lastPeakToPeak(0), initialized(false) {}
+    AudioSensor_ADC() : lastPeakToPeak(0), lastDb(30.0f), initialized(false) {}
     
     bool init() override {
         pinMode(PIN_MIC_ANALOG, INPUT);
@@ -54,18 +58,19 @@ public:
         }
         
         lastPeakToPeak = maxVal - minVal;
+        lastDb = peakToDb(lastPeakToPeak);
         return lastPeakToPeak;
     }
     
     /**
-     * @brief 检测是否有噪音（使用上次读取的值）
-     * @note 调用前应先调用 readPeakToPeak() 获取最新值
+     * @brief 检测是否有噪音（使用分贝阈值）
      */
     bool isNoiseDetected() override {
-        bool detected = lastPeakToPeak > NOISE_THRESHOLD_HIGH;
+        uint16_t threshold = dbToPeak(NOISE_THRESHOLD_DB);
+        bool detected = lastPeakToPeak > threshold;
         
         if (detected) {
-            DEBUG_PRINTF("[传感器] ⚠️ 噪音: %d > %d\n", lastPeakToPeak, NOISE_THRESHOLD_HIGH);
+            DEBUG_PRINTF("[传感器] ⚠️ 噪音: %.0f dB > %d dB\n", lastDb, NOISE_THRESHOLD_DB);
         }
         
         return detected;
@@ -89,15 +94,10 @@ public:
     }
     
     /**
-     * @brief 估算分贝值（仅供参考，未经校准）
-     * @note 基于峰峰值的对数映射，大致范围 30-90 dB
-     *       实际分贝需要专业设备校准
+     * @brief 获取上次测量的分贝值
      */
-    float estimateDb() const {
-        if (lastPeakToPeak <= 1) return 30.0f;  // 静音基准
-        // 对数映射: 峰峰值 1-4095 → 约 30-90 dB
-        float db = 30.0f + 20.0f * log10((float)lastPeakToPeak);
-        return constrain(db, 30.0f, 100.0f);
+    float getLastDb() const {
+        return lastDb;
     }
     
     /**
@@ -105,10 +105,8 @@ public:
      */
     void printStatus() {
         uint16_t level = readPeakToPeak();
-        uint8_t percent = getSoundPercent();
-        
-        DEBUG_PRINTF("[Audio] 状态: 峰峰值=%d (%d%%), 阈值=%d, %s\n",
-                     level, percent, NOISE_THRESHOLD_HIGH,
-                     level > NOISE_THRESHOLD_HIGH ? "⚠️ 超标" : "✓ 正常");
+        DEBUG_PRINTF("[Audio] 状态: %.0f dB (峰峰值=%d), 阈值=%d dB, %s\n",
+                     lastDb, level, NOISE_THRESHOLD_DB,
+                     lastDb > NOISE_THRESHOLD_DB ? "⚠️ 超标" : "✓ 正常");
     }
 };

@@ -12,6 +12,7 @@
 #include "../interfaces/IGPS.h"
 #include "../interfaces/ISensor.h"
 #include "../modules/real/LSM6DS3_Sensor.h"
+#include "../modules/real/AudioSensor_ADC.h"
 #include "../utils/DataPayload.h"
 #include "DeviceFactory.h"
 #include "SystemManager.h"
@@ -65,10 +66,13 @@ public:
 
     // 2. 读取声音
     uint16_t soundLevel = 0;
+    float soundDb = 30.0f;
     IAudio *audioSensor = DeviceFactory::createAudioSensor();
     if (audioSensor && audioSensor->init()) {
       soundLevel = audioSensor->readPeakToPeak();
-      DEBUG_PRINTF("[巡检] 声音: %d\n", soundLevel);
+      AudioSensor_ADC *adcSensor = static_cast<AudioSensor_ADC *>(audioSensor);
+      soundDb = adcSensor->getLastDb();
+      DEBUG_PRINTF("[巡检] 声音: %.0f dB\n", soundDb);
     }
 
     // 3. 检查倾斜阈值
@@ -89,11 +93,11 @@ public:
 
     // 4. 检查声音阈值
     if (audioSensor && audioSensor->isNoiseDetected()) {
-      DEBUG_PRINTLN("[报警] 🚨 异常噪音");
+      DEBUG_PRINTF("[报警] 🚨 噪音: %.0f dB > %d dB\n", soundDb, NOISE_THRESHOLD_DB);
       audioSensor->sleep();
       DeviceFactory::destroy(audioSensor);
 
-      if (sendNoiseAlarmWithPhoto(batteryVoltage, soundLevel)) {
+      if (sendNoiseAlarmWithPhoto(batteryVoltage, soundDb)) {
         SystemManager::deepSleep(SLEEP_DURATION_ALARM);
         return;
       }
@@ -105,7 +109,7 @@ public:
     }
 
     // 5. 正常心跳（包含所有传感器数据）
-    sendStatusHeartbeat(relativeAngle, batteryVoltage, soundLevel);
+    sendStatusHeartbeat(relativeAngle, batteryVoltage, soundDb);
     SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
   }
 
@@ -120,22 +124,30 @@ public:
     DEBUG_PRINTF("[巡检] 电池: %.2fV (%d%%)\n", batteryVoltage, batteryPercent);
 
     IAudio *audioSensor = DeviceFactory::createAudioSensor();
-    if (!audioSensor || !audioSensor->init() ||
-        !audioSensor->isNoiseDetected()) {
-      DEBUG_PRINTLN("[报警] ⚠️ 误触发");
+    if (!audioSensor || !audioSensor->init()) {
+      DEBUG_PRINTLN("[报警] ⚠️ 传感器初始化失败");
       if (audioSensor) {
-        audioSensor->sleep();
         DeviceFactory::destroy(audioSensor);
       }
       SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
       return;
     }
+    
+    audioSensor->readPeakToPeak();  // 先读取
+    if (!audioSensor->isNoiseDetected()) {
+      DEBUG_PRINTLN("[报警] ⚠️ 误触发");
+      audioSensor->sleep();
+      DeviceFactory::destroy(audioSensor);
+      SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
+      return;
+    }
 
-    uint16_t soundLevel = audioSensor->readPeakToPeak();
+    AudioSensor_ADC *adcSensor = static_cast<AudioSensor_ADC *>(audioSensor);
+    float soundDb = adcSensor->getLastDb();
     audioSensor->sleep();
     DeviceFactory::destroy(audioSensor);
 
-    sendNoiseAlarmWithPhoto(batteryVoltage, soundLevel);
+    sendNoiseAlarmWithPhoto(batteryVoltage, soundDb);
     SystemManager::deepSleep(SLEEP_DURATION_ALARM);
   }
 
@@ -292,12 +304,13 @@ private:
         alarmJson = TiltAlarmPayload(value, voltage).toJson();
       }
     } else {
+      // noise: value 是分贝值
       if (hasGps) {
-        alarmJson = NoiseAlarmPayload(voltage, (uint16_t)value,
+        alarmJson = NoiseAlarmPayload(voltage, value,
                                       gpsData.latitude, gpsData.longitude)
                         .toJson();
       } else {
-        alarmJson = NoiseAlarmPayload(voltage, (uint16_t)value).toJson();
+        alarmJson = NoiseAlarmPayload(voltage, value).toJson();
       }
     }
 
@@ -321,14 +334,14 @@ private:
     return dispatchAlarm("tilt", angle, voltage);
   }
 
-  static bool sendNoiseAlarmWithPhoto(float voltage, uint16_t soundLevel) {
-    return dispatchAlarm("noise", (float)soundLevel, voltage);
+  static bool sendNoiseAlarmWithPhoto(float voltage, float soundDb) {
+    return dispatchAlarm("noise", soundDb, voltage);
   }
 
   /**
    * @brief 发送状态心跳（包含所有传感器数据）
    */
-  static void sendStatusHeartbeat(float angle, float voltage, uint16_t soundLevel) {
+  static void sendStatusHeartbeat(float angle, float voltage, float soundDb) {
     GpsData gpsData;
     bool hasGps = getGpsLocation(gpsData);
 
@@ -341,9 +354,9 @@ private:
 
     StatusPayload statusData;
     if (hasGps) {
-      statusData = StatusPayload(angle, voltage, soundLevel, gpsData.latitude, gpsData.longitude);
+      statusData = StatusPayload(angle, voltage, soundDb, gpsData.latitude, gpsData.longitude);
     } else {
-      statusData = StatusPayload(angle, voltage, soundLevel);
+      statusData = StatusPayload(angle, voltage, soundDb);
     }
 
     String statusJson = statusData.toJson();
