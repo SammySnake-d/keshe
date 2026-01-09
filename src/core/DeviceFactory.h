@@ -36,30 +36,23 @@ private:
   static ISensor *_tiltSensor;
   static IComm *_commModule;
   static IAudio *_audioSensor;
-  // GPS 和 Camera 每次都重新创建（资源占用大）
+  static IGPS *_gpsModule;
 #endif
 
 public:
   /**
    * @brief 创建倾斜传感器实例
-   * @return ISensor* 实例指针
    */
   static ISensor *createTiltSensor() {
 #if !ENABLE_DEEP_SLEEP
-    // 测试模式：复用已有实例
     if (_tiltSensor != nullptr) {
-      DEBUG_PRINTLN("[Factory] 复用传感器: LSM6DS3_Sensor");
       return _tiltSensor;
     }
 #endif
 
-    DEBUG_PRINT("[Factory] 创建传感器: ");
-
 #if USE_MOCK_HARDWARE
-    DEBUG_PRINTLN("MockTiltSensor");
     auto sensor = new MockTiltSensor();
 #else
-    DEBUG_PRINTLN("LSM6DS3_Sensor");
     auto sensor = new LSM6DS3_Sensor();
 #endif
 
@@ -71,24 +64,17 @@ public:
 
   /**
    * @brief 创建通信模块实例
-   * @return IComm* 实例指针
    */
   static IComm *createCommModule() {
 #if !ENABLE_DEEP_SLEEP
-    // 测试模式：复用已有实例
     if (_commModule != nullptr) {
-      DEBUG_PRINTLN("[Factory] 复用通信模块: WifiComm");
       return _commModule;
     }
 #endif
 
-    DEBUG_PRINT("[Factory] 创建通信模块: ");
-
 #if USE_MOCK_HARDWARE
-    DEBUG_PRINTLN("MockComm");
     auto comm = new MockComm();
 #else
-    DEBUG_PRINTLN("WifiComm (Bemfa)");
     auto comm = new WifiComm();
 #endif
 
@@ -100,39 +86,39 @@ public:
 
   /**
    * @brief 创建 GPS 模块实例
-   * @return IGPS* 实例指针
    */
   static IGPS *createGpsModule() {
-    DEBUG_PRINT("[Factory] 创建 GPS 模块: ");
+#if !ENABLE_DEEP_SLEEP
+    if (_gpsModule != nullptr) {
+      return _gpsModule;
+    }
+#endif
 
 #if USE_MOCK_HARDWARE
-    DEBUG_PRINTLN("MockGPS");
-    return new MockGPS();
+    auto gps = new MockGPS();
 #else
-    DEBUG_PRINTLN("ATGM336H_Driver");
-    return new ATGM336H_Driver();
+    auto gps = new ATGM336H_Driver();
 #endif
+
+#if !ENABLE_DEEP_SLEEP
+    _gpsModule = gps;
+#endif
+    return gps;
   }
 
   /**
    * @brief 创建音频传感器实例
-   * @return IAudio* 实例指针
    */
   static IAudio *createAudioSensor() {
 #if !ENABLE_DEEP_SLEEP
     if (_audioSensor != nullptr) {
-      DEBUG_PRINTLN("[Factory] 复用音频传感器: AudioSensor_ADC");
       return _audioSensor;
     }
 #endif
 
-    DEBUG_PRINT("[Factory] 创建音频传感器: ");
-
 #if USE_MOCK_HARDWARE
-    DEBUG_PRINTLN("MockAudioSensor");
     auto audio = new MockAudioSensor();
 #else
-    DEBUG_PRINTLN("AudioSensor_ADC");
     auto audio = new AudioSensor_ADC();
 #endif
 
@@ -143,17 +129,12 @@ public:
   }
 
   /**
-   * @brief 创建摄像头实例
-   * @return ICamera* 实例指针
+   * @brief 创建摄像头实例（不复用，资源占用大）
    */
   static ICamera *createCamera() {
-    DEBUG_PRINT("[Factory] 创建摄像头: ");
-
 #if USE_MOCK_HARDWARE
-    DEBUG_PRINTLN("MockCamera");
     return new MockCamera();
 #else
-    DEBUG_PRINTLN("OV2640_Camera");
     return new OV2640_Camera();
 #endif
   }
@@ -163,11 +144,12 @@ public:
    */
   template <typename T> static void destroy(T *instance) {
 #if !ENABLE_DEEP_SLEEP
-    // 测试模式：不销毁单例实例（通过地址比较）
+    // 测试模式：不销毁单例实例
     if ((void*)instance == (void*)_tiltSensor || 
         (void*)instance == (void*)_commModule || 
-        (void*)instance == (void*)_audioSensor) {
-      return;  // 跳过销毁
+        (void*)instance == (void*)_audioSensor ||
+        (void*)instance == (void*)_gpsModule) {
+      return;
     }
 #endif
     if (instance != nullptr) {
@@ -182,4 +164,5 @@ public:
 ISensor *DeviceFactory::_tiltSensor = nullptr;
 IComm *DeviceFactory::_commModule = nullptr;
 IAudio *DeviceFactory::_audioSensor = nullptr;
+IGPS *DeviceFactory::_gpsModule = nullptr;
 #endif

@@ -66,29 +66,19 @@ private:
 
 public:
   bool init() override {
-    DEBUG_PRINTLN("[LSM6DS3] 初始化中...");
-
-    // 1. 先结束可能存在的 Wire 实例
     Wire.end();
     delay(10);
     
-    // 2. 用正确的引脚初始化 I2C
     if (!Wire.begin(PIN_LSM_SDA, PIN_LSM_SCL, 100000)) {
-      DEBUG_PRINTLN("[LSM6DS3] ❌ I2C 总线初始化失败！");
+      DEBUG_PRINTLN("[传感器] ❌ I2C 初始化失败");
       return false;
     }
-    DEBUG_PRINTF("[LSM6DS3] I2C 初始化: SDA=%d, SCL=%d\n", PIN_LSM_SDA, PIN_LSM_SCL);
-    
     delay(100);
 
-    // 3. 扫描 I2C 总线
-    DEBUG_PRINTLN("[LSM6DS3] 扫描 I2C 总线...");
     bool found = false;
     for (uint8_t addr = 0x6A; addr <= 0x6B; addr++) {
       Wire.beginTransmission(addr);
-      uint8_t error = Wire.endTransmission();
-      if (error == 0) {
-        DEBUG_PRINTF("[LSM6DS3] ✓ 发现设备: 0x%02X\n", addr);
+      if (Wire.endTransmission() == 0) {
         deviceAddr = addr;
         found = true;
         break;
@@ -96,42 +86,27 @@ public:
     }
     
     if (!found) {
-      DEBUG_PRINTLN("[LSM6DS3] ❌ 未发现 I2C 设备！请检查接线:");
-      DEBUG_PRINTF("  - SDA 应连接到 GPIO %d\n", PIN_LSM_SDA);
-      DEBUG_PRINTF("  - SCL 应连接到 GPIO %d\n", PIN_LSM_SCL);
-      DEBUG_PRINTLN("  - 确认 LSM6DS3 供电正常");
+      DEBUG_PRINTLN("[传感器] ❌ 未发现 IMU");
       return false;
     }
 
-    // 4. 重新创建 imu 对象（使用扫描到的地址）
-    // 注意：由于 imu 是成员变量，这里用 placement new 或直接调用 begin
-    // SparkFun 库的 begin() 会使用构造时的地址
-    
-    // 5. 初始化传感器
     if (imu.begin() != 0) {
-      DEBUG_PRINTLN("[LSM6DS3] ❌ SparkFun 库初始化失败！");
+      DEBUG_PRINTLN("[传感器] ❌ IMU 初始化失败");
       return false;
     }
 
-    DEBUG_PRINTLN("[LSM6DS3] ✓ 基本初始化成功");
-
-    // 轮询模式：只需保证加速度计在工作（26 Hz, ±2g）
-    if (!writeRegister(LSM6DS3_CTRL1_XL, 0x20)) {
-      DEBUG_PRINTLN("[LSM6DS3]   ❌ 加速度计配置失败");
-      return false;
-    }
-    DEBUG_PRINTLN("[LSM6DS3] ✓ 轮询模式 (中断功能已裁剪)");
-
+    writeRegister(LSM6DS3_CTRL1_XL, 0x20);
+    
+    DEBUG_PRINTLN("[传感器] ✓ IMU 就绪");
     return true;
   }
 
   /**
-   * @brief 设置零点校准角度（首次启动时调用）
+   * @brief 设置零点校准角度
    */
   void calibrate(float pitch, float roll) {
     initialPitch = pitch;
     initialRoll = roll;
-    DEBUG_PRINTF("[LSM6DS3] 零点校准: Pitch=%.2f°, Roll=%.2f°\n", pitch, roll);
   }
 
   /**
@@ -154,10 +129,6 @@ public:
 
     // 返回最大偏移量
     float maxTilt = max(deltaPitch, deltaRoll);
-
-    DEBUG_PRINTF("[LSM6DS3] Pitch=%.2f°, Roll=%.2f° | 相对偏移=%.2f°\n",
-                 currentPitch, currentRoll, maxTilt);
-
     return maxTilt;
   }
 
@@ -190,11 +161,6 @@ public:
   }
 
   void sleep() override {
-    // 进入低功耗模式
-    // LSM6DS3 可以配置为 Sleep 模式或关闭加速度计
-    DEBUG_PRINTLN("[LSM6DS3] 进入低功耗模式");
-
-    // 释放 I2C 总线（让摄像头可以使用）
     Wire.end();
   }
 

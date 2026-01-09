@@ -33,29 +33,18 @@ public:
     AudioSensor_ADC() : lastPeakToPeak(0), initialized(false) {}
     
     bool init() override {
-        // 配置 ADC
         pinMode(PIN_MIC_ANALOG, INPUT);
-        analogReadResolution(12);       // 12位精度 (0-4095)
-        analogSetAttenuation(ADC_11db); // 0-3.3V 量程
-        
+        analogReadResolution(12);
+        analogSetAttenuation(ADC_11db);
         initialized = true;
-        DEBUG_PRINTLN("[Audio] 初始化成功 (ADC 模式)");
-        DEBUG_PRINTF("[Audio] 引脚: GPIO%d, 阈值: %d, 采样数: %d\n", 
-                     PIN_MIC_ANALOG, NOISE_THRESHOLD_HIGH, NOISE_SAMPLE_COUNT);
         return true;
     }
     
     uint16_t readPeakToPeak() override {
-        if (!initialized) {
-            DEBUG_PRINTLN("[Audio] ❌ 未初始化！");
-            return 0;
-        }
+        if (!initialized) return 0;
         
-        // 快速采样计算峰峰值
         uint16_t minVal = 4095;
         uint16_t maxVal = 0;
-        
-        unsigned long startTime = micros();
         
         for (int i = 0; i < NOISE_SAMPLE_COUNT; i++) {
             uint16_t sample = analogRead(PIN_MIC_ANALOG);
@@ -64,13 +53,7 @@ public:
             delayMicroseconds(NOISE_SAMPLE_INTERVAL_US);
         }
         
-        unsigned long elapsed = micros() - startTime;
-        
         lastPeakToPeak = maxVal - minVal;
-        
-        DEBUG_PRINTF("[Audio] 采样完成: min=%d, max=%d, 峰峰值=%d (耗时 %lu us)\n", 
-                     minVal, maxVal, lastPeakToPeak, elapsed);
-        
         return lastPeakToPeak;
     }
     
@@ -79,10 +62,7 @@ public:
         bool detected = level > NOISE_THRESHOLD_HIGH;
         
         if (detected) {
-            DEBUG_PRINTF("[Audio] ⚠️ 检测到异常声音！峰峰值: %d > 阈值: %d\n", 
-                         level, NOISE_THRESHOLD_HIGH);
-        } else {
-            DEBUG_PRINTF("[Audio] 环境正常，峰峰值: %d\n", level);
+            DEBUG_PRINTF("[传感器] ⚠️ 噪音: %d > %d\n", level, NOISE_THRESHOLD_HIGH);
         }
         
         return detected;
@@ -94,7 +74,6 @@ public:
     
     void sleep() override {
         // ADC 无需特殊休眠处理
-        DEBUG_PRINTLN("[Audio] 进入休眠模式");
     }
     
     // ========== 扩展方法 ==========

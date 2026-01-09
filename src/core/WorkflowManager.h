@@ -22,66 +22,50 @@ public:
    * @brief 首次启动校准流程
    */
   static void handleFirstBoot() {
-    DEBUG_PRINTLN("\n[MAIN] 🔧 首次启动 - 执行零点校准");
+    DEBUG_PRINTLN("[系统] 首次启动 - 零点校准");
 
-    // 倾斜传感器校准
     ISensor *tiltSensor = DeviceFactory::createTiltSensor();
     if (!tiltSensor || !tiltSensor->init()) {
-      DEBUG_PRINTLN("[MAIN] ❌ 传感器初始化失败");
+      DEBUG_PRINTLN("[传感器] ❌ 初始化失败");
       return;
     }
 
-    // 读取初始角度（绝对值）- 同时校准 Pitch 和 Roll
     LSM6DS3_Sensor *lsm = static_cast<LSM6DS3_Sensor *>(tiltSensor);
     float initialPitch = lsm->getAbsolutePitch();
-    float initialRoll = lsm->getAbsoluteRoll();  // 修复：同时校准 Roll
+    float initialRoll = lsm->getAbsoluteRoll();
 
-    // 保存到 RTC 内存和传感器对象
     SystemManager::calibrateInitialPose(initialPitch, initialRoll);
     lsm->calibrate(initialPitch, initialRoll);
 
-    DEBUG_PRINTF("[SYS] 零点校准完成: Pitch=%.2f°, Roll=%.2f°\n", initialPitch,
-                 initialRoll);
+    DEBUG_PRINTLN("[系统] ✓ 零点校准完成");
 
-    // 音频传感器初始化
     IAudio *audioSensor = DeviceFactory::createAudioSensor();
-    if (audioSensor && audioSensor->init()) {
-      DEBUG_PRINTLN("[Audio] 声音传感器初始化完成");
-    }
+    if (audioSensor) audioSensor->init();
     DeviceFactory::destroy(audioSensor);
 
     tiltSensor->sleep();
     DeviceFactory::destroy(tiltSensor);
-
-    DEBUG_PRINTLN("[MAIN] ✓ 校准完成，进入首次休眠\n");
   }
 
   /**
    * @brief 定时器唤醒 - 心跳巡检流程
-   * @note 每次唤醒时检查倾斜和声音，判断是否超过阈值
    */
   static void handleTimerWakeup() {
-    DEBUG_PRINTLN("\n[MAIN] ⏰ 定时器唤醒 - 心跳巡检");
-
-    // 读取并显示电池状态
     float batteryVoltage = SystemManager::readBatteryVoltage();
     int batteryPercent = SystemManager::getBatteryPercentage();
-    DEBUG_PRINTF("[MAIN] 🔋 电池状态: %.2fV (%d%%)\n", batteryVoltage,
-                 batteryPercent);
+    DEBUG_PRINTF("[巡检] 电池: %.2fV (%d%%)\n", batteryVoltage, batteryPercent);
 
-    // 1. 读取倾角（相对于初始位置的偏移）
+    // 1. 读取倾角
     float relativeAngle = readTiltAngle();
     if (relativeAngle < 0) {
       SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
       return;
     }
+    DEBUG_PRINTF("[巡检] 倾角: %.2f°\n", relativeAngle);
 
-    // 2. 检查是否超过 5° 倾斜阈值（软件判断）
+    // 2. 检查倾斜阈值
     if (relativeAngle > TILT_THRESHOLD) {
-      DEBUG_PRINTF("\n[MAIN] 🚨 检测到倾斜 %.2f° > %.2f° 阈值！启动报警流程\n",
-                   relativeAngle, TILT_THRESHOLD);
-
-      // 更新倾斜触发时间 (用于 GPS 联动)
+      DEBUG_PRINTF("[报警] 🚨 倾斜: %.2f° > %.2f°\n", relativeAngle, TILT_THRESHOLD);
       g_last_tilt_trigger_ms = millis();
 
       if (sendTiltAlarmWithPhoto(relativeAngle, batteryVoltage)) {
@@ -90,12 +74,11 @@ public:
       }
     }
 
-    // 3. 检查声音是否超过阈值（模拟信号，软件轮询检测）
-    DEBUG_PRINTLN("[MAIN] 🔊 检测环境声音...");
+    // 3. 检查声音
     IAudio *audioSensor = DeviceFactory::createAudioSensor();
     if (audioSensor && audioSensor->init() && audioSensor->isNoiseDetected()) {
-      DEBUG_PRINTLN("\n[MAIN] 🚨 检测到异常声音！启动报警流程");
-      uint16_t soundLevel = audioSensor->readPeakToPeak(); // 保存声音等级
+      DEBUG_PRINTLN("[报警] 🚨 异常噪音");
+      uint16_t soundLevel = audioSensor->readPeakToPeak();
       audioSensor->sleep();
       DeviceFactory::destroy(audioSensor);
 
@@ -110,10 +93,8 @@ public:
       }
     }
 
-    // 4. 正常心跳上报
+    // 4. 正常心跳
     sendStatusHeartbeat(relativeAngle, batteryVoltage);
-
-    DEBUG_PRINTLN("[MAIN] ✓ 心跳完成，进入休眠\n");
     SystemManager::deepSleep(HEARTBEAT_INTERVAL_SEC);
   }
 
@@ -246,8 +227,6 @@ private:
 
   /**
    * @brief 获取 GPS 定位数据
-   * @param gpsData 输出的 GPS 数据
-   * @return true=定位成功, false=定位失败
    */
   static bool getGpsLocation(GpsData &gpsData) {
     IGPS *gps = DeviceFactory::createGpsModule();
@@ -256,68 +235,47 @@ private:
       return false;
     }
 
-    DEBUG_PRINTLN("[MAIN] 📡 正在获取 GPS 定位...");
     unsigned long gpsTimeout = USE_MOCK_HARDWARE ? 5000 : 30000;
-
     bool success = gps->getLocation(gpsData, gpsTimeout);
 
-    if (success) {
-      DEBUG_PRINTF("[MAIN] ✓ GPS 定位成功: %.6f, %.6f\n", gpsData.latitude,
-                   gpsData.longitude);
-    } else {
-      DEBUG_PRINTLN("[MAIN] ⚠️  GPS 定位失败");
+    if (!success) {
+      DEBUG_PRINTLN("[GPS] ⚠️ 定位失败");
     }
 
     gps->sleep();
     DeviceFactory::destroy(gps);
-
     return success;
   }
 
   /**
-   * @brief 统一报警处理流程 (拍照 -> 上传图片 -> 发送数据)
-   * @param type 报警类型 ("tilt" 或 "noise")
-   * @param value 报警数值 (角度或声音等级)
-   * @param voltage 电池电压
+   * @brief 统一报警处理流程
    */
   static bool dispatchAlarm(const char *type, float value, float voltage) {
-    // 1. 获取 GPS 位置
+    // 1. 获取 GPS
     GpsData gpsData;
     bool hasGps = getGpsLocation(gpsData);
 
-    // 2. 初始化通信模块
+    // 2. 初始化通信
     IComm *commModule = DeviceFactory::createCommModule();
     if (!commModule || !commModule->init() || !commModule->connectNetwork()) {
-      DEBUG_PRINTLN("[MAIN] ❌ 通信模块启动失败");
+      DEBUG_PRINTLN("[通信] ❌ 连接失败");
       DeviceFactory::destroy(commModule);
       return false;
     }
 
-    // 3. 拍照并上传
+    // 3. 拍照上传
     ICamera *camera = DeviceFactory::createCamera();
     if (camera && camera->init()) {
       uint8_t *photoBuffer = nullptr;
       size_t photoSize = 0;
       if (camera->capturePhoto(&photoBuffer, &photoSize)) {
-        DEBUG_PRINTF("[MAIN] ✓ 拍照成功 (%d bytes)\n", photoSize);
-
-        // 构建图片元数据
-        String metadata;
-        if (strcmp(type, "tilt") == 0) {
-          metadata =
-              String("{\"device_id\":\"") + HTTP_DEVICE_ID +
-              String("\",\"type\":\"tilt\",\"angle\":" + String(value, 2) +
-                     "}");
-        } else {
-          metadata = String("{\"device_id\":\"") + HTTP_DEVICE_ID +
-                     String("\",\"type\":\"noise\",\"sound_level\":" +
-                            String((int)value) + "}");
-        }
-
+        DEBUG_PRINTF("[上报] 📷 图片: %d bytes\n", photoSize);
+        String metadata = String("{\"device_id\":\"") + HTTP_DEVICE_ID +
+                         "\",\"type\":\"" + type + "\"}";
         if (commModule->uploadImage(photoBuffer, photoSize, metadata.c_str())) {
-          DEBUG_PRINTLN("[MAIN] ✓ 图片上传成功");
+          DEBUG_PRINTLN("[上报] ✓ 图片上传成功");
         } else {
-          DEBUG_PRINTLN("[MAIN] ⚠️ 图片上传失败");
+          DEBUG_PRINTLN("[上报] ⚠️ 图片上传失败");
         }
       }
       camera->releasePhoto();
@@ -325,7 +283,7 @@ private:
       DeviceFactory::destroy(camera);
     }
 
-    // 4. 构建报警 JSON
+    // 4. 构建并发送报警
     String alarmJson;
     if (strcmp(type, "tilt") == 0) {
       if (hasGps) {
@@ -344,16 +302,15 @@ private:
       }
     }
 
-    DEBUG_PRINTF("[MAIN] 📤 发送 %s 报警数据\n", type);
-    DEBUG_PRINTF("[MAIN] 📦 上报内容: %s\n", alarmJson.c_str());
+    DEBUG_PRINTF("[上报] 📤 %s报警: %s\n", 
+                 strcmp(type, "tilt") == 0 ? "倾斜" : "噪音", 
+                 alarmJson.c_str());
 
-    // 5. 发送数据
     char serverResponse[256] = {0};
     bool success = commModule->sendAlarm(alarmJson.c_str(), serverResponse,
                                          sizeof(serverResponse));
-
-    if (success && strlen(serverResponse) > 0) {
-      DEBUG_PRINTF("[MAIN] 📥 服务器响应: %s\n", serverResponse);
+    if (success) {
+      DEBUG_PRINTLN("[上报] ✓ 发送成功");
     }
 
     commModule->sleep();
@@ -370,64 +327,41 @@ private:
   }
 
   /**
-   * @brief 发送状态心跳（含 GPS）
+   * @brief 发送状态心跳
    */
   static void sendStatusHeartbeat(float angle, float voltage) {
-    // 1. 获取 GPS
     GpsData gpsData;
     bool hasGps = getGpsLocation(gpsData);
 
-    // 2. 初始化通信模块
     IComm *commModule = DeviceFactory::createCommModule();
     if (!commModule || !commModule->init() || !commModule->connectNetwork()) {
-      DEBUG_PRINTLN("[MAIN] ❌ 通信模块启动失败");
+      DEBUG_PRINTLN("[通信] ❌ 连接失败");
       DeviceFactory::destroy(commModule);
       return;
     }
 
-    // 3. 构建并发送心跳
     StatusPayload statusData;
     if (hasGps) {
-      statusData =
-          StatusPayload(angle, voltage, gpsData.latitude, gpsData.longitude);
+      statusData = StatusPayload(angle, voltage, gpsData.latitude, gpsData.longitude);
     } else {
       statusData = StatusPayload(angle, voltage);
     }
 
     String statusJson = statusData.toJson();
-    DEBUG_PRINTLN("[MAIN] 📤 发送心跳数据");
-    DEBUG_PRINTF("[MAIN] 📦 上报内容: %s\n", statusJson.c_str());
+    DEBUG_PRINTF("[上报] 📤 心跳: %s\n", statusJson.c_str());
 
-    // 4. 发送状态并接收服务器响应（HTTP 捎带下行指令）
     char serverResponse[256] = {0};
-
-    // 插入: 检查是否需要单独上传 GPS (参考 project-name 的 60s 定时上传)
     uploadGpsIfNeeded(commModule);
 
-    if (commModule->sendStatus(statusJson.c_str(), serverResponse,
-                               sizeof(serverResponse))) {
-      DEBUG_PRINTLN("[MAIN] ✓ 心跳发送成功");
-
-      // 解析服务器响应中的指令
-      if (strlen(serverResponse) > 0) {
-        DEBUG_PRINTF("[MAIN] 📥 服务器响应: %s\n", serverResponse);
-
-        // 简单的 JSON 解析（查找 "command" 字段）
-        if (strstr(serverResponse, "\"command\"")) {
-          if (strstr(serverResponse, "set_interval")) {
-            DEBUG_PRINTLN("[MAIN] 🔧 执行指令: 修改上报间隔");
-            // TODO: 解析 value 并修改定时器
-          } else if (strstr(serverResponse, "reboot")) {
-            DEBUG_PRINTLN("[MAIN] 🔧 执行指令: 重启设备");
-            ESP.restart();
-          } else if (strstr(serverResponse, "capture")) {
-            DEBUG_PRINTLN("[MAIN] 🔧 执行指令: 立即拍照");
-            // TODO: 触发拍照流程
-          }
+    if (commModule->sendStatus(statusJson.c_str(), serverResponse, sizeof(serverResponse))) {
+      DEBUG_PRINTLN("[上报] ✓ 发送成功");
+      // 解析服务器指令
+      if (strlen(serverResponse) > 0 && strstr(serverResponse, "\"command\"")) {
+        if (strstr(serverResponse, "reboot")) {
+          DEBUG_PRINTLN("[系统] 执行重启指令");
+          ESP.restart();
         }
       }
-    } else {
-      DEBUG_PRINTLN("[MAIN] ⚠️ 心跳发送失败");
     }
 
     commModule->sleep();
