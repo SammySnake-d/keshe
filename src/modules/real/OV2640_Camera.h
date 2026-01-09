@@ -193,11 +193,8 @@ public:
   void powerOff() override {
 #if ENABLE_CAMERA
     releasePhoto();
-    // 注意：不调用 esp_camera_deinit()，因为它会破坏 ADC 配置
+    // 注意：不关闭摄像头电源，因为会破坏 ADC
     // 摄像头保持初始化状态，只释放帧缓冲
-    // 如果需要省电，可以关闭电源（但下次需要重新初始化）
-    // digitalWrite(PIN_CAM_PWDN, HIGH);
-    // initialized = false;
 #endif
   }
 
