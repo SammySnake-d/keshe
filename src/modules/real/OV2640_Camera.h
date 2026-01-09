@@ -66,6 +66,11 @@ public:
 #if !ENABLE_CAMERA
     return false;
 #else
+    // 如果已经初始化过，直接返回成功
+    if (initialized) {
+      return true;
+    }
+    
     // 1. 电源控制
     pinMode(PIN_CAM_PWDN, OUTPUT);
     digitalWrite(PIN_CAM_PWDN, HIGH);
@@ -110,7 +115,7 @@ public:
     esp_err_t err = esp_camera_init(&config);
     if (err != ESP_OK) {
       DEBUG_PRINTF("[相机] ❌ 初始化失败: 0x%x\n", err);
-      powerOff();
+      digitalWrite(PIN_CAM_PWDN, HIGH);
       return false;
     }
 
@@ -188,11 +193,11 @@ public:
   void powerOff() override {
 #if ENABLE_CAMERA
     releasePhoto();
-    if (initialized) {
-      esp_camera_deinit();
-      initialized = false;
-    }
-    digitalWrite(PIN_CAM_PWDN, HIGH);
+    // 注意：不调用 esp_camera_deinit()，因为它会破坏 ADC 配置
+    // 摄像头保持初始化状态，只释放帧缓冲
+    // 如果需要省电，可以关闭电源（但下次需要重新初始化）
+    // digitalWrite(PIN_CAM_PWDN, HIGH);
+    // initialized = false;
 #endif
   }
 

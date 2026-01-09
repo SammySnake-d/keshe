@@ -37,6 +37,7 @@ private:
   static IComm *_commModule;
   static IAudio *_audioSensor;
   static IGPS *_gpsModule;
+  static ICamera *_camera;
 #endif
 
 public:
@@ -129,14 +130,25 @@ public:
   }
 
   /**
-   * @brief 创建摄像头实例（不复用，资源占用大）
+   * @brief 创建摄像头实例（单例模式，避免 esp_camera_deinit 破坏 ADC）
    */
   static ICamera *createCamera() {
-#if USE_MOCK_HARDWARE
-    return new MockCamera();
-#else
-    return new OV2640_Camera();
+#if !ENABLE_DEEP_SLEEP
+    if (_camera != nullptr) {
+      return _camera;
+    }
 #endif
+
+#if USE_MOCK_HARDWARE
+    auto camera = new MockCamera();
+#else
+    auto camera = new OV2640_Camera();
+#endif
+
+#if !ENABLE_DEEP_SLEEP
+    _camera = camera;
+#endif
+    return camera;
   }
 
   /**
@@ -148,7 +160,8 @@ public:
     if ((void*)instance == (void*)_tiltSensor || 
         (void*)instance == (void*)_commModule || 
         (void*)instance == (void*)_audioSensor ||
-        (void*)instance == (void*)_gpsModule) {
+        (void*)instance == (void*)_gpsModule ||
+        (void*)instance == (void*)_camera) {
       return;
     }
 #endif
@@ -165,4 +178,5 @@ ISensor *DeviceFactory::_tiltSensor = nullptr;
 IComm *DeviceFactory::_commModule = nullptr;
 IAudio *DeviceFactory::_audioSensor = nullptr;
 IGPS *DeviceFactory::_gpsModule = nullptr;
+ICamera *DeviceFactory::_camera = nullptr;
 #endif

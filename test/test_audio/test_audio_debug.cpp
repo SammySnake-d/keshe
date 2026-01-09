@@ -5,6 +5,8 @@
 
 #include <Arduino.h>
 #include <unity.h>
+#include <Wire.h>
+#include "esp_camera.h"
 
 // 引脚定义
 #define PIN_MIC_ANALOG 8   // GPIO8 - ADC1_CH7
@@ -80,61 +82,21 @@ void test_gpio8_status() {
 }
 
 /**
- * @brief 测试3：WiFi 对 ADC 的影响
+ * @brief 测试3：连续读取稳定性
  */
-void test_wifi_adc_conflict() {
-    Serial.println("\n========== 测试3: WiFi 对 ADC 的影响 ==========");
-    Serial.println("注意: WiFi 使用 ADC2，麦克风使用 ADC1_CH7 (GPIO8)");
-    Serial.println("理论上不应该冲突...\n");
+void test_continuous_read() {
+    Serial.println("\n========== 测试3: 连续读取稳定性 ==========");
     
-    // WiFi 启动前
-    Serial.println("WiFi 启动前：");
-    for (int i = 0; i < 3; i++) {
-        Serial.printf("  第 %d 次: ", i + 1);
-        readPeakToPeak();
-        delay(200);
+    Serial.println("快速连续读取 20 次：");
+    int zeroCount = 0;
+    for (int i = 0; i < 20; i++) {
+        Serial.printf("第 %02d 次: ", i + 1);
+        uint16_t pp = readPeakToPeak();
+        if (pp == 0) zeroCount++;
+        delay(100);
     }
     
-    // 启动 WiFi
-    Serial.println("\n启动 WiFi...");
-    #include <WiFi.h>
-    WiFi.mode(WIFI_STA);
-    WiFi.begin("zhoujiayi", "zhoujiayi");
-    
-    int timeout = 0;
-    while (WiFi.status() != WL_CONNECTED && timeout < 20) {
-        delay(500);
-        Serial.print(".");
-        timeout++;
-    }
-    
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf("\nWiFi 已连接: %s\n", WiFi.localIP().toString().c_str());
-    } else {
-        Serial.println("\nWiFi 连接失败");
-    }
-    
-    // WiFi 启动后
-    Serial.println("\nWiFi 启动后：");
-    for (int i = 0; i < 5; i++) {
-        Serial.printf("  第 %d 次: ", i + 1);
-        readPeakToPeak();
-        delay(500);
-    }
-    
-    // 断开 WiFi
-    Serial.println("\n断开 WiFi...");
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    delay(100);
-    
-    // WiFi 断开后
-    Serial.println("\nWiFi 断开后：");
-    for (int i = 0; i < 3; i++) {
-        Serial.printf("  第 %d 次: ", i + 1);
-        readPeakToPeak();
-        delay(200);
-    }
+    Serial.printf("\n统计: %d/20 次为零\n", zeroCount);
     
     TEST_PASS();
 }
@@ -144,8 +106,6 @@ void test_wifi_adc_conflict() {
  */
 void test_i2c_adc_conflict() {
     Serial.println("\n========== 测试4: I2C 对 ADC 的影响 ==========");
-    
-    #include <Wire.h>
     
     // I2C 启动前
     Serial.println("I2C 启动前：");
@@ -193,8 +153,6 @@ void test_i2c_adc_conflict() {
  */
 void test_camera_adc_conflict() {
     Serial.println("\n========== 测试5: 摄像头对 ADC 的影响 ==========");
-    
-    #include "esp_camera.h"
     
     // 摄像头启动前
     Serial.println("摄像头启动前：");
@@ -255,30 +213,32 @@ void test_camera_adc_conflict() {
         delay(200);
     }
     
-    // 拍照
-    Serial.println("\n拍照...");
-    camera_fb_t *fb = esp_camera_fb_get();
-    if (fb) {
-        Serial.printf("拍照成功: %d bytes\n", fb->len);
-        esp_camera_fb_return(fb);
+    // 拍照多次
+    Serial.println("\n连续拍照 3 次...");
+    for (int j = 0; j < 3; j++) {
+        camera_fb_t *fb = esp_camera_fb_get();
+        if (fb) {
+            Serial.printf("  拍照 %d: %d bytes\n", j+1, fb->len);
+            esp_camera_fb_return(fb);
+        }
+        delay(100);
     }
     
-    // 拍照后
-    Serial.println("\n拍照后：");
-    for (int i = 0; i < 3; i++) {
+    // 拍照后（不调用 deinit）
+    Serial.println("\n拍照后（保持摄像头初始化）：");
+    for (int i = 0; i < 5; i++) {
         Serial.printf("  第 %d 次: ", i + 1);
         readPeakToPeak();
         delay(200);
     }
     
-    // 关闭摄像头
-    Serial.println("\n关闭摄像头...");
-    esp_camera_deinit();
-    digitalWrite(46, HIGH);  // 关闭摄像头电源
+    // 不调用 esp_camera_deinit()，只关闭电源
+    Serial.println("\n关闭摄像头电源（不调用 deinit）...");
+    digitalWrite(46, HIGH);
     
-    // 关闭后
-    Serial.println("\n摄像头关闭后：");
-    for (int i = 0; i < 3; i++) {
+    // 关闭电源后
+    Serial.println("\n摄像头电源关闭后：");
+    for (int i = 0; i < 5; i++) {
         Serial.printf("  第 %d 次: ", i + 1);
         readPeakToPeak();
         delay(200);
@@ -331,10 +291,10 @@ void setup() {
     
     RUN_TEST(test_basic_adc_read);
     RUN_TEST(test_gpio8_status);
+    RUN_TEST(test_continuous_read);
     RUN_TEST(test_i2c_adc_conflict);
     RUN_TEST(test_camera_adc_conflict);
     RUN_TEST(test_adc_reinit);
-    // RUN_TEST(test_wifi_adc_conflict);  // WiFi 测试单独运行
     
     UNITY_END();
 }
